@@ -1,3 +1,4 @@
+import { momenceFetch, momenceConfigured } from "@/lib/momence-auth";
 import { NextResponse } from "next/server";
 import { getLeads, patchLead } from "@/lib/sheet";
 import { cleanDate } from "@/lib/sheet";
@@ -33,10 +34,10 @@ export async function PUT(req: Request) {
   } as unknown as Partial<import("@/lib/types").Lead>);
 
   // forward to Momence (same logic as momence route but only FU fields)
-  const cookies = process.env.MOMENCE_ALL_COOKIES;
+  const configured = momenceConfigured();
   const hostId = lead.hostId || process.env.MOMENCE_HOST_ID || "13752";
   let momence: { ok: boolean; message: string } | null = null;
-  if (cookies) {
+  if (configured) {
     try {
       const payload: Record<string, string> = {
         [patchKeyDate]: cleanD ? `${cleanD.slice(8, 10)}/${cleanD.slice(5, 7)}/${cleanD.slice(2, 4)}` : "",
@@ -63,13 +64,12 @@ export async function PUT(req: Request) {
         fu4D: index === 3 ? payload.fu4D : lead.followUps[3]?.date ? `${lead.followUps[3].date!.slice(8, 10)}/${lead.followUps[3].date!.slice(5, 7)}/${lead.followUps[3].date!.slice(2, 4)}` : "",
         fu4C: index === 3 ? payload.fu4C : lead.followUps[3]?.comment ?? "",
       };
-      const res = await fetch(`https://momence.com/_api/primary/host/${hostId}/customer-leads/${lead.id}`, {
+      const res = await momenceFetch(`https://momence.com/_api/primary/host/${hostId}/customer-leads/${lead.id}`, {
         method: "PUT",
         headers: {
           accept: "application/json, text/plain, */*",
           "content-type": "application/json",
-          cookie: cookies,
-          origin: "https://momence.com",
+                    origin: "https://momence.com",
           referer: `https://momence.com/dashboard/${hostId}/leads/${lead.id}`,
           "x-origin": `https://momence.com/dashboard/${hostId}/leads/${lead.id}`,
           "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",

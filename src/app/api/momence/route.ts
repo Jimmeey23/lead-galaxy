@@ -1,3 +1,4 @@
+import { momenceFetch, momenceConfigured } from "@/lib/momence-auth";
 import { NextResponse } from "next/server";
 import { getLeads, patchLead } from "@/lib/sheet";
 import type { Lead } from "@/lib/types";
@@ -68,11 +69,11 @@ function buildPayload(lead: Lead, patch: Record<string, string>) {
 }
 
 async function pushOne(lead: Lead, patch: Record<string, string>) {
-  const cookies = process.env.MOMENCE_ALL_COOKIES;
+  const configured = momenceConfigured();
   const hostId = lead.hostId || process.env.MOMENCE_HOST_ID || "13752";
   const url = `https://momence.com/_api/primary/host/${hostId}/customer-leads/${lead.id}`;
   const payload = buildPayload(lead, patch);
-  if (!cookies) {
+  if (!configured) {
     return {
       id: lead.id,
       ok: false,
@@ -83,13 +84,12 @@ async function pushOne(lead: Lead, patch: Record<string, string>) {
     };
   }
   try {
-    const res = await fetch(url, {
+    const res = await momenceFetch(url, {
       method: "PUT",
       headers: {
         accept: "application/json, text/plain, */*",
         "content-type": "application/json",
-        cookie: cookies,
-        origin: "https://momence.com",
+                origin: "https://momence.com",
         referer: `https://momence.com/dashboard/${hostId}/leads/${lead.id}`,
         "x-origin": `https://momence.com/dashboard/${hostId}/leads/${lead.id}`,
         "user-agent":
@@ -111,7 +111,7 @@ async function pushOne(lead: Lead, patch: Record<string, string>) {
 
 export async function GET() {
   return NextResponse.json({
-    configured: !!process.env.MOMENCE_ALL_COOKIES,
+    configured: momenceConfigured(),
     hostId: process.env.MOMENCE_HOST_ID || "13752",
     editableFields: EDITABLE.map((e) => e.label),
   });
@@ -138,6 +138,6 @@ export async function PUT(req: Request) {
     results,
     succeeded: results.filter((r) => r.ok).length,
     failed: results.filter((r) => !r.ok).length,
-    configured: !!process.env.MOMENCE_ALL_COOKIES,
+    configured: momenceConfigured(),
   });
 }
