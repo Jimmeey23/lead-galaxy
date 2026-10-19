@@ -294,16 +294,17 @@ export function GraphicKpi({
     critical: "var(--critical)",
   };
   return (
-    <div onClick={onClick} className={cx("metric-card p-4", onClick && "cursor-pointer card-hover")}>
+    <div onClick={onClick} className={cx("metric-card kpi-card", onClick && "cursor-pointer card-hover")}>
       <div className="relative z-10">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-muted text-[11px] font-semibold tracking-wide uppercase">{label}</p>
-            <p className="num mt-2 text-[26px] leading-none font-semibold tracking-tight">{value}</p>
-            {sub && <p className="text-faint mt-1 text-[11.5px] leading-snug">{sub}</p>}
+            <p className="kpi-label text-muted text-[10.5px] font-semibold tracking-[0.09em] uppercase">{label}</p>
+            <p className="kpi-value num mt-3">{value}</p>
+
           </div>
-          {icon && <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: `color-mix(in srgb, ${toneColor[tone]} 14%, var(--surface))`, color: toneColor[tone], border: `1px solid color-mix(in srgb, ${toneColor[tone]} 18%, transparent)` }}>{icon}</span>}
+          {icon && <span className="kpi-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl" style={{ background: `color-mix(in srgb, ${toneColor[tone]} 14%, var(--surface))`, color: toneColor[tone], border: `1px solid color-mix(in srgb, ${toneColor[tone]} 18%, transparent)` }}>{icon}</span>}
         </div>
+        {sub && <p className="kpi-detail text-muted text-[11.5px] leading-snug">{sub}</p>}
         {(d || spark) && (
           <div className="mt-3 flex items-center gap-2">
             {d && <span className="num inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: good ? "var(--positive-soft)" : "var(--critical-soft)", color: good ? "var(--positive)" : "var(--critical)" }}>{d.pct == null ? "new" : `${d.up ? "↗" : "↘"} ${pctStr(Math.abs(d.pct))}`}</span>}

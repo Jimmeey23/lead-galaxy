@@ -164,7 +164,7 @@ export function Overview({ a, drill, goExplorer }: { a: Analytics; drill: (p: Pa
 
       {/* AI Pulse row */}
       <div className="grid gap-3 lg:grid-cols-4">
-        <div className="metric-card p-4" style={{ background: "var(--accent-soft)", borderColor: "color-mix(in srgb, var(--accent) 18%, var(--border))" }}>
+        <div className="metric-card p-4" style={{ borderColor: "color-mix(in srgb, var(--accent) 18%, var(--border))" }}>
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}><Bot size={16} /></span>
             <div>

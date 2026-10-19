@@ -6,7 +6,7 @@
 }
 
 :root {
-  --bg: #f7f6f4;
+  --bg: #ffffff;
   --bg-elevated: #ffffff;
   --surface: #ffffff;
   --surface-2: #f1efec;
@@ -15,7 +15,7 @@
   --border-strong: #d3cdc7;
   --text: #171412;
   --text-muted: #6d6660;
-  --text-faint: #9b948e;
+  --text-faint: #746f6b;
   --accent: #c2275c;
   --accent-soft: #fcedf3;
   --accent-contrast: #ffffff;
@@ -30,7 +30,7 @@
   --info-soft: #edf1fe;
   --shadow: 0 1px 2px rgba(28, 22, 18, 0.04), 0 8px 22px -12px rgba(28, 22, 18, 0.1);
   --shadow-lg: 0 20px 52px -20px rgba(28, 22, 18, 0.25);
-  --shadow-card: 0 1px 2px rgba(23, 20, 18, 0.05), 0 10px 28px -16px rgba(23, 20, 18, 0.12);
+  --shadow-card: 8px 8px 24px rgba(28, 39, 55, 0.08), -8px -8px 24px #ffffff, inset 1px 1px 0 #ffffff;
   --chart-1: #c2275c;
   --chart-2: #1c4ed8;
   --chart-3: #0d7a4b;
@@ -38,8 +38,8 @@
   --chart-5: #7c3aed;
   --chart-6: #0e7490;
   --grid: #ecE9e5;
-  --sidebar: #fdfcfb;
-  --topbar: rgba(247, 246, 244, 0.85);
+  --sidebar: #ffffff;
+  --topbar: rgba(255, 255, 255, 0.92);
 }
 
 .dark {
@@ -179,3 +179,22 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.55; cursor: p
 tbody tr { transition: background-color 0.12s ease; }
 
 @media print { .no-print { display: none !important; } body { background: #fff; } body::before { display: none; } }
+
+/* White sculpted surfaces: depth comes from shadows, not tinted fills. */
+:root:not(.dark) body::before { display: none; }
+:root:not(.dark) .card,
+:root:not(.dark) .metric-card { background: #fff; border-color: #edf0f3; }
+:root:not(.dark) .metric-card::after { display: none; }
+.metric-card { border-radius: 20px; }
+.kpi-card { min-height: 154px; padding: 20px; }
+.kpi-label { max-width: 23ch; line-height: 1.5; }
+.kpi-value { font-family: var(--font-display); font-size: clamp(25px, 2vw, 32px); line-height: 1.15; font-weight: 700; letter-spacing: -0.045em; }
+.kpi-detail { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 18px; }
+.kpi-icon { box-shadow: inset 2px 2px 5px rgba(26, 35, 48, 0.06), inset -2px -2px 5px rgba(255,255,255,0.5); }
+.brand-mark { background: var(--surface); color: var(--accent); border: 1px solid var(--border); box-shadow: var(--shadow-card); }
+:root:not(.dark) input,
+:root:not(.dark) select,
+:root:not(.dark) textarea { box-shadow: inset 2px 2px 5px rgba(28, 39, 55, 0.05), inset -2px -2px 5px #fff; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

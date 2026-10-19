@@ -96,11 +96,12 @@ function Shell() {
         style={{ background: "var(--sidebar)" }}
       >
         <div className="flex items-center gap-3 px-4 py-5">
-          <span
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[13px] font-bold"
-            style={{ background: "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #7c3aed))", color: "var(--accent-contrast)", boxShadow: "0 4px 14px -4px var(--accent-glow), 0 2px 6px rgba(0,0,0,0.15)" }}
-          >
-            57
+          <span className="brand-mark flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl">
+            <svg viewBox="0 0 40 40" width="32" height="32" role="img" aria-label="Physique 57 Lead Intelligence">
+              <path d="M8 29V13h7c7 0 7 10 0 10H8" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M22 29v-7m6 7V17m6 12V10" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              <circle cx="28" cy="9" r="2.5" fill="currentColor" />
+            </svg>
           </span>
           {!collapsed && (
             <div className="min-w-0">
