@@ -1,3 +1,4 @@
+import { resolveMomenceHost } from "./momence-host";
 import type { Lead } from "./types";
 
 const SHEET_ID =
@@ -215,7 +216,7 @@ export function normalise(rows: string[][]): { leads: Lead[]; headers: string[] 
       followUps,
       center: cleanStr(get(row, I.center)) || "Unassigned",
       classType: cleanStr(get(row, I.classType)) || "Unknown",
-      hostId: cleanStr(get(row, I.hostId)),
+      hostId: resolveMomenceHost({ center: cleanStr(get(row, I.center)), hostId: cleanStr(get(row, I.hostId)) }),
       status: cleanStr(get(row, I.status)) || "Unknown",
       channel: cleanStr(get(row, I.channel)) || "Unknown",
       period: cleanStr(get(row, I.period)),

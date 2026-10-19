@@ -1,3 +1,4 @@
+import { resolveMomenceHost, MOMENCE_HOSTS } from "@/lib/momence-host";
 import { momenceFetch, momenceConfigured } from "@/lib/momence-auth";
 import { NextResponse } from "next/server";
 import { getLeads, patchLead } from "@/lib/sheet";
@@ -70,7 +71,7 @@ function buildPayload(lead: Lead, patch: Record<string, string>) {
 
 async function pushOne(lead: Lead, patch: Record<string, string>) {
   const configured = momenceConfigured();
-  const hostId = lead.hostId || process.env.MOMENCE_HOST_ID || "13752";
+  const hostId = resolveMomenceHost(lead);
   const url = `https://momence.com/_api/primary/host/${hostId}/customer-leads/${lead.id}`;
   const payload = buildPayload(lead, patch);
   if (!configured) {
@@ -112,7 +113,8 @@ async function pushOne(lead: Lead, patch: Record<string, string>) {
 export async function GET() {
   return NextResponse.json({
     configured: momenceConfigured(),
-    hostId: process.env.MOMENCE_HOST_ID || "13752",
+    hostId: MOMENCE_HOSTS.mumbai,
+    hosts: MOMENCE_HOSTS,
     editableFields: EDITABLE.map((e) => e.label),
   });
 }

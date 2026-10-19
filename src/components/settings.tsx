@@ -18,9 +18,15 @@ import { fmtDateTime } from "@/lib/format";
 import { DEFAULT_CADENCE, type CadenceConfig } from "@/lib/cadence-config";
 import type { Analytics } from "./modules";
 
+const Status = ({ ok, label }: { ok: boolean; label: string }) => (
+    <span className="inline-flex items-center gap-1.5 text-[12.5px]" style={{ color: ok ? "var(--positive)" : "var(--critical)" }}>
+      {ok ? <CheckCircle2 size={14} /> : <XCircle size={14} />} {label}
+    </span>
+  );
+
 export function SettingsModule({ a, onRefresh }: { a: Analytics; onRefresh: () => void }) {
   const { theme, setTheme, autoRefresh, setAutoRefresh, savedViews, deleteView, bumpRefresh } = useApp();
-  const [momence, setMomence] = useState<{ configured: boolean; hostId: string; editableFields: string[] } | null>(null);
+  const [momence, setMomence] = useState<{ configured: boolean; hostId: string; hosts: { bengaluru: string; mumbai: string }; editableFields: string[] } | null>(null);
   const [sheet, setSheet] = useState<{ sheetUrl: string; rows: number; error: string | null } | null>(null);
 
   useEffect(() => {
@@ -28,11 +34,7 @@ export function SettingsModule({ a, onRefresh }: { a: Analytics; onRefresh: () =
     fetch("/api/sync").then((r) => r.json()).then(setSheet).catch(() => {});
   }, []);
 
-  const Status = ({ ok, label }: { ok: boolean; label: string }) => (
-    <span className="inline-flex items-center gap-1.5 text-[12.5px]" style={{ color: ok ? "var(--positive)" : "var(--critical)" }}>
-      {ok ? <CheckCircle2 size={14} /> : <XCircle size={14} />} {label}
-    </span>
-  );
+
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -79,9 +81,9 @@ export function SettingsModule({ a, onRefresh }: { a: Analytics; onRefresh: () =
         <div className="space-y-2.5 text-[12.5px]">
           <Status
             ok={!!momence?.configured}
-            label={momence?.configured ? "MOMENCE_ALL_COOKIES credential detected" : "MOMENCE_ALL_COOKIES is not configured — edits stay local"}
+            label={momence?.configured ? "Momence session or automatic login configured" : "MOMENCE_ALL_COOKIES is not configured — edits stay local"}
           />
-          <p className="text-muted">Host ID: <span className="num font-medium">{momence?.hostId ?? "—"}</span></p>
+          <p className="text-muted">Bengaluru: <span className="num font-medium">{momence?.hosts?.bengaluru ?? "33905"}</span> · Mumbai: <span className="num font-medium">{momence?.hosts?.mumbai ?? "13752"}</span></p>
           <p className="text-muted">
             Endpoint: <code className="text-[11.5px]">PUT https://momence.com/_api/primary/host/&#123;hostId&#125;/customer-leads/&#123;leadId&#125;</code>
           </p>

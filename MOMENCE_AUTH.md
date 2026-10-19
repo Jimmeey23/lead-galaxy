@@ -8,7 +8,7 @@ Copy `.env.example` to `.env.local` and set:
 - `MOMENCE_PASSWORD`: existing account password
 - `MOMENCE_TOTP_SECRET`: base32 shared secret for that account's existing authenticator
 - `MOMENCE_ALL_COOKIES`: optional initial cookie string
-- `MOMENCE_HOST_ID`: studio host ID
+- Regional routing is built in: Bengaluru centers use `33905`; Mumbai centers use `13752`. Recognized center names override stale sheet host IDs. Unknown/event centers preserve source host `33905` when present, otherwise use `13752`.
 
 Restart the development server after changing credentials. Never prefix these variables with `NEXT_PUBLIC_`.
 

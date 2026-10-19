@@ -1,3 +1,4 @@
+import { resolveMomenceHost } from "@/lib/momence-host";
 import { momenceFetch, momenceConfigured } from "@/lib/momence-auth";
 import { NextResponse } from "next/server";
 import { getLeads, patchLead } from "@/lib/sheet";
@@ -35,7 +36,7 @@ export async function PUT(req: Request) {
 
   // forward to Momence (same logic as momence route but only FU fields)
   const configured = momenceConfigured();
-  const hostId = lead.hostId || process.env.MOMENCE_HOST_ID || "13752";
+  const hostId = resolveMomenceHost(lead);
   let momence: { ok: boolean; message: string } | null = null;
   if (configured) {
     try {
