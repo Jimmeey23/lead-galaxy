@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { CONVERSION_DEFINITION } from "@/lib/conversion";
 import {
   AlertTriangle,
   ArrowRight,
@@ -531,12 +532,12 @@ export function QualityModule({ a }: { a: Analytics }) {
         <div className="grid gap-2 md:grid-cols-2">
           {[
             ["Total Leads", "Count of distinct, valid lead IDs within the active filtered population."],
-            ["Conversion Rate (Sales-truth)", "A lead is converted when Sales sheet shows at least one succeeded purchase for that Member ID/email."],
+            ["Conversion Rate (Sales-truth)", CONVERSION_DEFINITION],
             ["Total LTV (Sales-truth)", "Sum of Payment Value for succeeded, non-voided sales joined on Member ID or Email."],
             ["Visits (Check-ins truth)", "Count of Checked In = TRUE rows for that Member ID joined from the Check-ins sheet."],
             ["Trial Status (Check-ins truth)", "Trial Completed if any check-in for that member is a trial class; otherwise Not Tried."],
             ["Retention (Check-ins + Sales)", "Retained when visits ≥5 or (visits ≥3 and purchases ≥2) — configurable heuristic."],
-            ["Avg Time to Conversion", "Mean days between Created At and earliest Sale Date from Sales sheet."],
+            ["Avg Time to Conversion", "Mean days between lead creation and the first eligible post-creation sale for the exact same Member ID."],
             ["Follow-up Coverage", "Share with ≥1 recorded follow-up date/comment; a record is not proof of contact."],
             ["Cross-sheet flags", "Discrepancies between Leads sheet values and Sales/Check-ins truth are surfaced as flags."],
             ["Cadence", "Follow-up due dates follow the cadence configured in Settings (defaults: FU1 2d after creation, then 3d / 5d / 7d gaps); overdue/missed computed daily IST."],

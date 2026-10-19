@@ -19,7 +19,6 @@ export const EDITABLE: { field: keyof Lead; label: string; momence: string }[] =
   { field: "stageName", label: "Stage Name", momence: "stage" },
   { field: "status", label: "Status", momence: "status" },
   { field: "trialStatus", label: "Trial Status", momence: "trialStatus" },
-  { field: "conversionStatus", label: "Conversion Status", momence: "conversionStatus" },
   { field: "retentionStatus", label: "Retention Status", momence: "retentionStatus" },
 ];
 
@@ -123,6 +122,12 @@ export async function PUT(req: Request) {
   const body = (await req.json()) as {
     updates: { id: string; patch: Record<string, string> }[];
   };
+  const allowed = new Set(EDITABLE.map((entry) => entry.field));
+  if (!Array.isArray(body.updates) || body.updates.some((update) =>
+    !update || typeof update.id !== "string" || !update.patch || typeof update.patch !== "object" ||
+    Object.entries(update.patch).some(([field, value]) => !allowed.has(field as keyof Lead) || typeof value !== "string"))) {
+    return NextResponse.json({ error: "Only supported editable fields are accepted. Conversion is calculated from eligible Sales records and cannot be edited." }, { status: 400 });
+  }
   const cache = await getLeads();
   const results = [];
   for (const u of body.updates.slice(0, 500)) {

@@ -177,6 +177,7 @@ function Shell() {
 
         <div className="p-4 md:p-6">
           {error && <Card><EmptyState title="Unable to load the lead dataset" description={error} icon={<Database size={18} />} action={<Button variant="primary" size="sm" className="mt-3" onClick={refresh}>Retry sync</Button>} /></Card>}
+          {data?.meta.error && <div role="alert" className="mb-4 rounded-xl border p-3 text-sm" style={{ color: "var(--warning)", background: "var(--warning-soft)" }}>{data.meta.error}</div>}
           {!data && loading && <Loading />}
           {data && (
             <>

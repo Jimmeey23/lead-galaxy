@@ -1,3 +1,4 @@
+import { isEligibleConversionSale, type ConversionSale } from "./conversion";
 import { cleanDate, cleanNum, cleanStr, parseCSV } from "./sheet";
 
 /* ----------------------------- IDs -------------------------------- */
@@ -18,6 +19,7 @@ export type SaleAgg = {
   lastSale: string | null;
   byLocation: Record<string, { purchases: number; ltv: number }>;
   raw: number; // total rows
+  conversionSales: ConversionSale[];
 };
 
 export type CheckinAgg = {
@@ -60,10 +62,10 @@ export async function fetchSalesAggs(): Promise<Map<string, SaleAgg>> {
   try {
     text = await csvFetch(SALES_CSV);
   } catch {
-    return new Map();
+    throw new Error("Sales source unavailable; conversion cannot be verified.");
   }
   const rows = parseCSV(text);
-  if (!rows.length) return new Map();
+  if (!rows.length) throw new Error("Sales source is empty; conversion cannot be verified.");
   const headers = rows[0].map((h) => h.trim());
   const idx = mapHeaders(headers);
   const iMid = idx["member id"] ?? idx["member id "] ?? -1;
@@ -74,6 +76,12 @@ export async function fetchSalesAggs(): Promise<Map<string, SaleAgg>> {
   const iLoc = idx["calculated location"] ?? -1;
   const iVoided = idx["sec. is voided"] ?? -1;
   const iPayItem = idx["payment item"] ?? -1;
+  const iProduct = idx["cleaned product"] ?? -1;
+  const iCategory = idx["cleaned category"] ?? -1;
+  const iMembership = idx["sec. membership name"] ?? -1;
+  if ([iMid, iPayVal, iStatus, iDate, iVoided, iPayItem, iProduct, iCategory, iMembership].some((index) => index < 0)) {
+    throw new Error("Sales schema changed; required conversion eligibility columns are missing.");
+  }
 
   const byMember = new Map<string, SaleAgg>();
   const keyFor = (mid: string, email: string) => mid || email.toLowerCase();
@@ -91,6 +99,7 @@ export async function fetchSalesAggs(): Promise<Map<string, SaleAgg>> {
         lastSale: null,
         byLocation: {},
         raw: 0,
+        conversionSales: [],
       };
       byMember.set(k, a);
     }
@@ -111,6 +120,11 @@ export async function fetchSalesAggs(): Promise<Map<string, SaleAgg>> {
     const loc = cleanStr(row[iLoc]) || "Unknown";
     const agg = getAgg(mid, email);
     agg.raw++;
+    if (isEligibleConversionSale({ memberId: mid, date, value: val, paymentStatus: status, voided,
+      category: cleanStr(row[iCategory]), product: cleanStr(row[iProduct]),
+      paymentItem: cleanStr(row[iPayItem]), membershipName: cleanStr(row[iMembership]) })) {
+      agg.conversionSales.push({ memberId: mid, date: date!, value: val! });
+    }
     if (isSucceeded) {
       agg.purchases++;
       if (val != null) agg.ltv += val;
@@ -123,6 +137,7 @@ export async function fetchSalesAggs(): Promise<Map<string, SaleAgg>> {
       if (val) agg.byLocation[loc].ltv += val;
     }
   }
+  for (const agg of byMember.values()) agg.conversionSales.sort((a, b) => a.date.localeCompare(b.date));
   return byMember;
 }
 

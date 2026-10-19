@@ -45,6 +45,7 @@ export type Lead = {
   rawVisits?: number | null;
   rawTrialStatus?: string;
   rawConversionStatus?: string;
+  rawConvertedAt?: string | null;
   rawRetentionStatus?: string;
   enriched?: boolean;
   firstSaleDate?: string | null;

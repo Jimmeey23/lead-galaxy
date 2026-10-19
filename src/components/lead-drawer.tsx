@@ -29,7 +29,6 @@ const EDIT_FIELDS: { key: keyof Lead; label: string }[] = [
   { key: "stageName", label: "Stage Name" },
   { key: "status", label: "Status" },
   { key: "trialStatus", label: "Trial Status" },
-  { key: "conversionStatus", label: "Conversion Status" },
   { key: "retentionStatus", label: "Retention Status" },
   { key: "remarks", label: "Remarks" },
 ];

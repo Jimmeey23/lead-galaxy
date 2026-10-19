@@ -98,8 +98,6 @@ export function cadenceForLead(lead: Lead, today = todayISO(), config: CadenceCo
   if (lead.followUpCount === 0) riskScore += 20;
   if (lead.createdAt && dayDiff(lead.createdAt, today) > 21 && !lead.converted) riskScore += 15;
   if ((lead.visits ?? 0) > 2 && !lead.converted) riskScore += 10;
-  if ((lead.ltv ?? 0) > 0 && !lead.converted) riskScore += 15; // discrepancy
-  if (lead.issues.some((i) => i.includes("Revenue"))) riskScore += 20;
 
   // opportunity: visits, trial, recent creation, high LTV
   if ((lead.visits ?? 0) > 0) opportunityScore += 20;
@@ -121,7 +119,7 @@ export function cadenceForLead(lead: Lead, today = todayISO(), config: CadenceCo
 
   // additional anomaly flags
   if (lead.converted && (lead.purchases ?? 0) === 0) flags.push("Marked converted but no purchase found in Sales sheet");
-  if (!lead.converted && (lead.purchases ?? 0) > 0) flags.push("Has purchase(s) in Sales sheet but not marked converted");
+  if (lead.conversionStatus === "Unverified") flags.push("Conversion unverified — Sales source unavailable");
   if (lead.converted && (lead.visits ?? 0) === 0) flags.push("Converted without any recorded visit");
   if ((lead.visits ?? 0) > 10 && !lead.converted) flags.push("High visit count but unconverted — investigate");
   if (lead.daysToConversion != null && lead.daysToConversion < 0) flags.push("Conversion precedes creation — data error");

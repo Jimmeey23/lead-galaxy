@@ -474,7 +474,7 @@ function GroupRows({ node, expanded, toggle, onLead }: { node: GroupNode; expand
   );
 }
 
-const BULK_FIELDS = ["associate", "center", "classType", "stageName", "status", "trialStatus", "conversionStatus", "retentionStatus", "remarks"];
+const BULK_FIELDS = ["associate", "center", "classType", "stageName", "status", "trialStatus", "retentionStatus", "remarks"];
 
 function BulkEditDrawer({ open, ids, onClose, onDone }: { open: boolean; ids: string[]; onClose: () => void; onDone: () => void }) {
   const [patch, setPatch] = useState<Record<string, string>>({});

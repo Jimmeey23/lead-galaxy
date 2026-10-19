@@ -1,3 +1,4 @@
+import { CONVERSION_RULE_VERSION, CONVERSION_DEFINITION } from "@/lib/conversion";
 import { NextResponse } from "next/server";
 import { getLeads } from "@/lib/sheet";
 import { applyFilters, comparisonRange, resolveRange } from "@/lib/filters";
@@ -163,6 +164,8 @@ export async function POST(req: Request) {
   const ai = analyze(rows, cadenceConfig);
   return NextResponse.json({
     meta: {
+      conversionRuleVersion: CONVERSION_RULE_VERSION,
+      conversionDefinition: CONVERSION_DEFINITION,
       syncedAt: cache.syncedAt,
       totalRows: cache.leads.length,
       filteredRows: rows.length,

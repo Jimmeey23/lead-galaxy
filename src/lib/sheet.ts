@@ -1,3 +1,4 @@
+import { firstConversionSale, CONVERSION_RULE_VERSION } from "./conversion";
 import { resolveMomenceHost } from "./momence-host";
 import type { Lead } from "./types";
 
@@ -174,7 +175,6 @@ export function normalise(rows: string[][]): { leads: Lead[]; headers: string[] 
       .filter((d): d is string => !!d)
       .sort();
     const firstFollowUp = fuDates[0] ?? null;
-    const converted = /^(converted|won)$/i.test(conversionStatus) || !!convertedAt;
     const ltv = cleanNum(get(row, I.ltv));
     const visits = cleanNum(get(row, I.visits));
     const purchases = cleanNum(get(row, I.purchases));
@@ -186,11 +186,6 @@ export function normalise(rows: string[][]): { leads: Lead[]; headers: string[] 
     if (!cleanStr(get(row, I.sourceName))) issues.push("Missing source");
     if (!cleanStr(get(row, I.phone)) && !cleanStr(get(row, I.email)))
       issues.push("No contact details");
-    if (converted && !convertedAt) issues.push("Converted without conversion date");
-    if (!converted && (ltv ?? 0) > 0)
-      issues.push("Revenue recorded but not marked converted");
-    if (/retained/i.test(retentionStatus) && !/^not/i.test(retentionStatus) && !converted)
-      issues.push("Retained but not converted");
     if (createdAt && convertedAt && dayDiff(createdAt, convertedAt) < 0)
       issues.push("Conversion date precedes creation date");
     if (followUps.some((f) => f.comment && !f.date)) issues.push("Follow-up comment without date");
@@ -209,7 +204,8 @@ export function normalise(rows: string[][]): { leads: Lead[]; headers: string[] 
       sourceId: cleanStr(get(row, I.sourceId)),
       sourceName: cleanStr(get(row, I.sourceName)) || "Unknown",
       memberId: cleanStr(get(row, I.memberId)),
-      convertedAt,
+      convertedAt: null,
+      rawConvertedAt: convertedAt,
       stageName: cleanStr(get(row, I.stage)) || "Unknown",
       associate: cleanStr(get(row, I.associate)) || "Unassigned",
       remarks: cleanStr(get(row, I.remarks)),
@@ -229,15 +225,15 @@ export function normalise(rows: string[][]): { leads: Lead[]; headers: string[] 
       ltv,
       visits,
       trialStatus: trialStatus || "Unknown",
-      conversionStatus: conversionStatus || "Unknown",
+      conversionStatus: "Unverified",
+      rawConversionStatus: conversionStatus || "Unknown",
       retentionStatus: retentionStatus || "Unknown",
-      converted,
+      converted: false,
       tried: !!trialStatus && !/^not tried$/i.test(trialStatus) && !/unknown/i.test(trialStatus),
       retained: /retained/i.test(retentionStatus) && !/^not/i.test(retentionStatus),
       followUpCount: recorded.length,
       firstFollowUp,
-      daysToConversion:
-        createdAt && convertedAt ? Math.max(0, dayDiff(createdAt, convertedAt)) : null,
+      daysToConversion: null,
       daysToFirstFollowUp:
         createdAt && firstFollowUp ? dayDiff(createdAt, firstFollowUp) : null,
       rowIndex: r + 1,
@@ -256,6 +252,7 @@ export function normalise(rows: string[][]): { leads: Lead[]; headers: string[] 
 
 /* -------------------------------- Caching -------------------------------- */
 type Cache = {
+  conversionRuleVersion: string;
   leads: Lead[];
   headers: string[];
   syncedAt: string | null;
@@ -265,12 +262,12 @@ type Cache = {
 };
 const g = globalThis as unknown as { __leadCache?: Cache };
 const cache: Cache =
-  g.__leadCache ??
-  (g.__leadCache = { leads: [], headers: [], syncedAt: null, error: null, loading: null, crossSheet: null });
+  (g.__leadCache?.conversionRuleVersion === CONVERSION_RULE_VERSION ? g.__leadCache : null) ??
+  (g.__leadCache = { conversionRuleVersion: CONVERSION_RULE_VERSION, leads: [], headers: [], syncedAt: null, error: null, loading: null, crossSheet: null });
 
 export const TTL_MS = 5 * 60 * 1000;
 
-function enrichWithCrossSheet(
+export function enrichWithCrossSheet(
   leads: Lead[],
   sales: Map<string, import("./crossSheet").SaleAgg>,
   checkins: Map<string, import("./crossSheet").CheckinAgg>,
@@ -289,11 +286,18 @@ function enrichWithCrossSheet(
     l.rawPurchases = l.purchases;
     l.rawVisits = l.visits;
     l.rawTrialStatus = l.trialStatus;
-    l.rawConversionStatus = l.conversionStatus;
+    l.rawConversionStatus ??= l.conversionStatus;
     l.rawRetentionStatus = l.retentionStatus;
     l.crossSheetFlags = l.crossSheetFlags ?? [];
     l.enriched = false;
 
+    // Conversion never uses email fallback or source labels/dates.
+    const memberSales = l.memberId ? sales.get(l.memberId) : undefined;
+    const qualifying = firstConversionSale(l.memberId, l.createdAt, memberSales?.conversionSales ?? []);
+    l.converted = !!qualifying;
+    l.conversionStatus = qualifying ? "Converted" : "Not Converted";
+    l.convertedAt = qualifying?.date ?? null;
+    l.daysToConversion = qualifying && l.createdAt ? dayDiff(l.createdAt, qualifying.date) : null;
     if (!sale && !chk) continue;
 
     let hasTruth = false;
@@ -306,18 +310,6 @@ function enrichWithCrossSheet(
       l.lastSaleDate = sale.lastSale;
       hasTruth = true;
       totalLtv += sale.ltv;
-      // conversion derived from sales truth
-      const salesConverted = sale.purchases > 0 && sale.ltv > 0;
-      if (salesConverted) {
-        l.converted = true;
-        l.conversionStatus = "Converted";
-        if (!l.convertedAt && sale.firstSale) l.convertedAt = sale.firstSale;
-      } else {
-        // keep unconverted but mark if sheet said converted and sales says not
-        if (l.converted) l.crossSheetFlags.push("Sheet marked converted but no sale found");
-        l.converted = false;
-        l.conversionStatus = "Not Converted";
-      }
       // discrepancy checks
       if ((beforeLtv ?? 0) !== sale.ltv) {
         if ((beforeLtv ?? 0) > 0 && sale.ltv === 0) l.crossSheetFlags.push("Sheet LTV >0 but Sales shows 0");
@@ -382,6 +374,7 @@ async function doFetch() {
 
   // cross-sheet enrichment (never block lead load if Sales/Checkins fail)
   let crossSheetMeta: import("./types").CrossSheetMeta | null = null;
+  let enrichmentError: string | null = null;
   try {
     const { fetchCrossSheet } = await import("./crossSheet");
     const cs = await fetchCrossSheet();
@@ -397,13 +390,13 @@ async function doFetch() {
       checkinsSyncedAt: new Date().toISOString(),
     };
   } catch {
-    // keep leads as-is
+    enrichmentError = "Sales enrichment unavailable; conversion is unverified. Retry sync to verify conversion.";
   }
 
   cache.leads = leads;
   cache.headers = headers;
   cache.syncedAt = new Date().toISOString();
-  cache.error = null;
+  cache.error = enrichmentError;
   cache.crossSheet = crossSheetMeta;
 }
 
