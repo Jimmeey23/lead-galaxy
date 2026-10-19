@@ -210,7 +210,8 @@ export function usePost<T>(url: string, body: unknown, deps: unknown[]) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(url, {
+    // Resolve against the page origin for fetch wrappers that require absolute URLs.
+    fetch(new URL(url, window.location.origin).href, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: key,

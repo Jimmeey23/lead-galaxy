@@ -1,4 +1,3 @@
-import { db } from "@/db";
 import { appSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { DEFAULT_CADENCE, type CadenceConfig } from "./cadence-config";
@@ -26,7 +25,9 @@ function sanitise(v: Partial<CadenceConfig> | null | undefined): CadenceConfig {
 export async function getCadence(): Promise<CadenceConfig> {
   const cached = g.__cadenceCache;
   if (cached && Date.now() - cached.at < 30_000) return cached.value;
+  if (!process.env.DATABASE_URL) return cached?.value ?? DEFAULT_CADENCE;
   try {
+    const { db } = await import("@/db");
     const rows = await db.select().from(appSettings).where(eq(appSettings.key, "cadence"));
     const value = sanitise(rows[0]?.value as Partial<CadenceConfig> | undefined);
     g.__cadenceCache = { value, at: Date.now() };
@@ -37,6 +38,10 @@ export async function getCadence(): Promise<CadenceConfig> {
 }
 
 export async function setCadence(input: Partial<CadenceConfig>): Promise<CadenceConfig> {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("Configure DATABASE_URL to save follow-up cadence settings.");
+  }
+  const { db } = await import("@/db");
   const value = sanitise(input);
   await db
     .insert(appSettings)
