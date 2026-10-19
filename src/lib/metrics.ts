@@ -384,3 +384,34 @@ export function buildInsights(leads: Lead[]): Insight[] {
   }
   return out;
 }
+
+export type PeriodMetrics = { date: string; kpis: Kpis };
+
+/** Creation-date cohorts, including empty intervening calendar periods. */
+export function periodMetrics(leads: Lead[], granularity: "month" | "week"): PeriodMetrics[] {
+  const bucket = (value: string) => {
+    const date = new Date(value + "T00:00:00Z");
+    if (granularity === "month") date.setUTCDate(1);
+    else date.setUTCDate(date.getUTCDate() - (date.getUTCDay() + 6) % 7);
+    return date.toISOString().slice(0, 10);
+  };
+  const groups = new Map<string, Lead[]>();
+  for (const lead of leads) {
+    if (!lead.createdAt) continue;
+    const key = bucket(lead.createdAt);
+    const group = groups.get(key) ?? [];
+    group.push(lead);
+    groups.set(key, group);
+  }
+  const dates = [...groups.keys()].sort();
+  if (!dates.length) return [];
+  const result: PeriodMetrics[] = [];
+  const cursor = new Date(dates[0] + "T00:00:00Z");
+  while (cursor.toISOString().slice(0, 10) <= dates[dates.length - 1]) {
+    const date = cursor.toISOString().slice(0, 10);
+    result.push({ date, kpis: computeKpis(groups.get(date) ?? []) });
+    if (granularity === "month") cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    else cursor.setUTCDate(cursor.getUTCDate() + 7);
+  }
+  return result;
+}

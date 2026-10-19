@@ -1,8 +1,8 @@
 /** Canonical lead conversion: exact Member ID + eligible sale on or after creation day. */
-export const CONVERSION_RULE_VERSION = "member-eligible-sale-v3";
-export const CONVERSION_DEFINITION = "Converted only when the same Member ID has a succeeded, non-voided, positive-value sale on or after the lead creation date. Excludes retail, money-credit products, 2-for-1, Intro Pack, Copper & Cloves Single Class Package and Copper + Cloves Credit. Email and source conversion labels/dates do not establish conversion; same-day purchases qualify.";
+export const CONVERSION_RULE_VERSION = "member-eligible-sale-v4";
+export const CONVERSION_DEFINITION = "Converted only when the same Member ID has a succeeded, non-voided, positive-value sale on or after the lead creation date. Excludes the membership used for the trial-completing visit, retail, money-credit products, 2-for-1, Intro Pack, Copper & Cloves Single Class Package and Copper + Cloves Credit. Email and source conversion labels/dates do not establish conversion; same-day purchases qualify.";
 
-export type ConversionSale = { memberId: string; date: string; value: number };
+export type ConversionSale = { memberId: string; date: string; value: number; membershipNames?: string[] };
 export type SaleEligibilityInput = {
   memberId: string; date: string | null; value: number | null;
   paymentStatus: string; voided: boolean;
@@ -24,10 +24,12 @@ export function isEligibleConversionSale(sale: SaleEligibilityInput): boolean {
     /\bcopper(?: and)? cloves (?:single class package|credit)\b/.test(name));
 }
 
-export function firstConversionSale(memberId: string, createdAt: string | null, sales: readonly ConversionSale[]): ConversionSale | null {
+export function firstConversionSale(memberId: string, createdAt: string | null, sales: readonly ConversionSale[], trialMembershipNames: readonly string[] = []): ConversionSale | null {
   if (!memberId.trim() || !validDay(createdAt)) return null;
+  const excluded = new Set(trialMembershipNames.map(normalized).filter(Boolean));
   return sales.reduce<ConversionSale | null>((first, sale) =>
-    sale.memberId === memberId && sale.date >= createdAt && (!first || sale.date < first.date) ? sale : first, null);
+    sale.memberId === memberId && sale.date >= createdAt &&
+    !sale.membershipNames?.some((name) => excluded.has(normalized(name))) && (!first || sale.date < first.date) ? sale : first, null);
 }
 
 export function isWonStage(stage: string): boolean {

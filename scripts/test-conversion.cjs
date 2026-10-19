@@ -31,6 +31,14 @@ function load(file) {
   assert.equal(first('m1', null, sales), null);
   assert.equal(first('m1', '2026-10-12', sales).date, '2026-10-12');
 
+  const trialSales = [
+    { memberId: 'm1', date: '2026-10-10', value: 100, membershipNames: ['Studio Trial Membership'] },
+    { memberId: 'm1', date: '2026-10-12', value: 500, membershipNames: ['Studio Monthly'] },
+  ];
+  assert.equal(first('m1', '2026-10-10', trialSales, ['studio-trial membership']).date, '2026-10-12');
+  assert.equal(first('m1', '2026-10-10', trialSales.slice(0, 1), ['Studio Trial Membership']), null);
+  assert.equal(first('m2', '2026-10-10', trialSales, ['Studio Trial Membership']), null);
+
   const { normalise, enrichWithCrossSheet } = load('src/lib/sheet.ts');
   const leads = normalise([
     ['ID', 'Member ID', 'Created At', 'Converted To Customer At', 'Conversion Status', 'Email', 'Stage Name'],
@@ -69,6 +77,14 @@ function load(file) {
     assert.deepEqual(attendance.get('m1').checkedInDates,['2026-10-09','2026-10-11']);
     enrichWithCrossSheet(leads,salesMap,attendance);
     assert.equal(leads[0].trialCompletedAt,'2026-10-11');
+    global.fetch = async () => new Response('Member ID,Email,Checked In,Date (IST),Payment Method Name,Cleaned Product\nm1,shared@example.com,TRUE,2026-10-10,Studio Monthly,Monthly');
+    const trialAttendance = await load('src/lib/crossSheet.ts').fetchCheckinAggs();
+    enrichWithCrossSheet(leads, salesMap, trialAttendance);
+    assert.equal(leads[0].tried, true);
+    assert.equal(leads[0].converted, false, 'Membership used to complete the trial cannot establish conversion');
+    salesMap.get('m1').conversionSales.push({ memberId: 'm1', date: '2026-10-12', value: 500, membershipNames: ['Annual'] });
+    enrichWithCrossSheet(leads, salesMap, trialAttendance);
+    assert.equal(leads[0].convertedAt, '2026-10-12', 'A different eligible membership can establish conversion');
     global.fetch = async () => new Response('unexpected,headers\n1,2');
     await assert.rejects(load('src/lib/crossSheet.ts').fetchSalesAggs(), /schema changed/);
     global.fetch = async () => { throw new Error('transport failed'); };

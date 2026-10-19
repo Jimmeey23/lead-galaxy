@@ -25,6 +25,7 @@ export type SaleAgg = {
 export type CheckinAgg = {
   memberId: string;
   email: string;
+  checkedInMemberships?: { date: string; names: string[] }[];
   checkedInDates: string[]; // exact member attendance evidence
   visits: number; // Checked In = TRUE
   complementary: number;
@@ -124,7 +125,8 @@ export async function fetchSalesAggs(): Promise<Map<string, SaleAgg>> {
     if (isEligibleConversionSale({ memberId: mid, date, value: val, paymentStatus: status, voided,
       category: cleanStr(row[iCategory]), product: cleanStr(row[iProduct]),
       paymentItem: cleanStr(row[iPayItem]), membershipName: cleanStr(row[iMembership]) })) {
-      agg.conversionSales.push({ memberId: mid, date: date!, value: val! });
+      agg.conversionSales.push({ memberId: mid, date: date!, value: val!,
+        membershipNames: [cleanStr(row[iMembership]), cleanStr(row[iProduct]), cleanStr(row[iPayItem])].filter((name) => !!name && name !== "-") });
     }
     if (isSucceeded) {
       agg.purchases++;
@@ -164,6 +166,8 @@ export async function fetchCheckinAggs(): Promise<Map<string, CheckinAgg>> {
   const iProd = idx["cleaned product"] ?? -1;
   const iCat = idx["cleaned category"] ?? -1;
   const iIsNew = idx["is new"] ?? -1;
+  const iPaymentMethod = idx["payment method name"] ?? -1;
+  const iMembership = idx["membership name"] ?? idx["sec. membership name"] ?? -1;
   const iSess = idx["session id"] ?? -1;
   if ([iMid, iChecked, iDate].some((index) => index < 0)) throw new Error("Check-ins schema changed; attendance cannot be verified.");
 
@@ -183,6 +187,7 @@ export async function fetchCheckinAggs(): Promise<Map<string, CheckinAgg>> {
         memberId: mid,
         email: email.toLowerCase(),
         checkedInDates: [],
+        checkedInMemberships: [],
         visits: 0,
         complementary: 0,
         lateCancelled: 0,
@@ -212,6 +217,7 @@ export async function fetchCheckinAggs(): Promise<Map<string, CheckinAgg>> {
     a.visits++;
     if (date) {
       a.checkedInDates.push(date);
+      a.checkedInMemberships!.push({ date, names: [cleanStr(row[iMembership]), cleanStr(row[iPaymentMethod]), cleanStr(row[iProd])].filter((name) => !!name && name !== "-") });
       if (!a.firstVisit || date < a.firstVisit) a.firstVisit = date;
       if (!a.lastVisit || date > a.lastVisit) a.lastVisit = date;
       const m = date.slice(0, 7);

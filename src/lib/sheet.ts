@@ -298,14 +298,16 @@ export function enrichWithCrossSheet(
 
     // Conversion never uses email fallback or source labels/dates.
     const memberSales = l.memberId ? sales.get(l.memberId) : undefined;
-    const qualifying = firstConversionSale(l.memberId, l.createdAt, memberSales?.conversionSales ?? []);
+    const memberCheckins = l.memberId ? checkins.get(l.memberId) : undefined;
+    const visitDate = l.createdAt && memberCheckins?.memberId === l.memberId
+      ? memberCheckins.checkedInDates.filter((date) => date >= l.createdAt!).sort()[0] : undefined;
+    const trialMembershipNames = memberCheckins?.checkedInMemberships
+      ?.filter((visit) => visit.date === visitDate).flatMap((visit) => visit.names) ?? [];
+    const qualifying = firstConversionSale(l.memberId, l.createdAt, memberSales?.conversionSales ?? [], trialMembershipNames);
     l.converted = !!qualifying;
     l.conversionStatus = qualifying ? "Converted" : "Not Converted";
     l.convertedAt = qualifying?.date ?? null;
     l.daysToConversion = qualifying && l.createdAt ? dayDiff(l.createdAt, qualifying.date) : null;
-    const memberCheckins = l.memberId ? checkins.get(l.memberId) : undefined;
-    const visitDate = l.createdAt && memberCheckins?.memberId === l.memberId
-      ? memberCheckins.checkedInDates.filter((date) => date >= l.createdAt!).sort()[0] : undefined;
     l.tried = !!visitDate;
     l.trialStatus = !checkinsAvailable ? "Unverified" : visitDate ? "Trial Completed" : "Not Tried";
     l.trialCompletedAt = visitDate ?? null;

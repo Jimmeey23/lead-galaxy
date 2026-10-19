@@ -25,12 +25,14 @@ import { Button, Card, Chip, EmptyState, GraphicKpi, Kpi, MultiSelect, Select, S
 import { BarRank, DonutChart, PALETTE, ScatterPlot, TrendChart } from "./charts";
 import { cx, days, inr, inrCompact, num, pctStr } from "@/lib/format";
 import type { GroupRow, Insight, Kpis } from "@/lib/metrics";
+import { PeriodTables } from "./period-tables";
 import type { FilterState, CrossSheetMeta } from "@/lib/types";
 
 export type Analytics = {
   meta: { syncedAt: string | null; totalRows: number; filteredRows: number; range: { from: string | null; to: string | null }; error: string | null; crossSheet: CrossSheetMeta | null; cadence?: import("@/lib/cadence-config").CadenceConfig };
   kpis: Kpis;
   compare: { range: { from: string | null; to: string | null }; kpis: Kpis } | null;
+  periods: { month: import("@/lib/metrics").PeriodMetrics[]; week: import("@/lib/metrics").PeriodMetrics[] };
   series: { date: string; leads: number; converted: number; trials: number; ltv: number; conversionRate: number }[];
   funnel: { stage: string; value: number; ofTotal: number; stepRate: number; dropOff: number }[];
   groups: Record<string, GroupRow[]>;
@@ -199,6 +201,7 @@ export function Overview({ a, drill, goExplorer }: { a: Analytics; drill: (p: Pa
         <GroupTable rows={a.groups.sourceName} dimension="Source" onDrill={(key) => drill({ sourceName: [key] })} />
       </Card>
 
+      <PeriodTables periods={a.periods} />
       <AIInsightsCard a={a} drill={drill} />
     </div>
   );

@@ -8,6 +8,7 @@ import {
   funnelStages,
   groupBy,
   timeSeries,
+  periodMetrics,
 } from "@/lib/metrics";
 import { analyze } from "@/lib/ai";
 import { getCadence } from "@/lib/cadence";
@@ -177,6 +178,7 @@ export async function POST(req: Request) {
     kpis,
     compare,
     series: timeSeries(rows, g),
+    periods: { month: periodMetrics(rows, "month"), week: periodMetrics(rows, "week") },
     funnel: funnelStages(rows),
     groups: {
       center: groupBy(rows, (l) => l.center),
