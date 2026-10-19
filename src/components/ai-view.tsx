@@ -9,6 +9,9 @@ import type { FilterState } from "@/lib/types";
 
 export function AIView({ a, drill, onOpenLead }: { a: Analytics; drill: (p: Partial<FilterState>) => void; onOpenLead?: (id: string) => void }) {
   const ai = a.ai;
+  const [patternId, setPatternId] = useState<string | null>(null);
+  const patterns = ai.patterns ?? [];
+  const selectedPattern = patterns.find((pattern) => pattern.id === patternId);
   const [tab, setTab] = useState<"missedFU" | "opportunities" | "discrepancies" | "anomalies">("missedFU");
 
   const toneForStatus = (s: string) => s === "missed" ? "critical" as const : s === "overdue" ? "warning" as const : s === "due-today" ? "warning" as const : "neutral" as const;
@@ -29,11 +32,27 @@ export function AIView({ a, drill, onOpenLead }: { a: Analytics; drill: (p: Part
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <GraphicKpi label="Missed follow-ups" value={num(ai.missedFollowups.length)} sub="sorted by overdue days" icon={<Clock size={14} />} tone="critical" />
+        <GraphicKpi label="Missed follow-ups" value={num(ai.summary.missed + ai.summary.overdue)} sub="sorted by overdue days" icon={<Clock size={14} />} tone="critical" />
         <GraphicKpi label="Missed opportunities" value={num(ai.missedOpportunities.length)} sub="high-intent unconverted" icon={<Target size={14} />} tone="warning" />
         <GraphicKpi label="Cross-sheet discrepancies" value={num(ai.summary.discrepancyCount)} sub="Sales/Check-ins truth vs sheet" icon={<ShieldAlert size={14} />} tone="critical" />
         <GraphicKpi label="Anomalies" value={num(ai.summary.anomalyCount)} sub="implausible patterns" icon={<Zap size={14} />} tone="info" />
       </div>
+
+      <Card title="Pattern intelligence" subtitle="Evidence-backed review signals · shared templates and stage mismatches need human review, not automatic correction">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {patterns.map((pattern) => <button key={pattern.id} onClick={() => setPatternId(pattern.id === patternId ? null : pattern.id)} className="focus-ring rounded-xl border p-4 text-left transition-colors hover:bg-[var(--surface-2)]" style={pattern.id === patternId ? {borderColor:"var(--accent)",background:"var(--accent-soft)"}:undefined}>
+            <div className="mb-2 flex items-center justify-between"><Chip tone={pattern.severity === "high" ? "critical" : "warning"}>{pattern.severity === "high" ? "Priority review" : "Review signal"}</Chip><span className="num text-lg font-semibold">{num(pattern.count)}</span></div>
+            <p className="text-[13px] font-semibold">{pattern.title}</p><p className="text-muted mt-1 text-xs">{pctStr(pattern.share)} of filtered leads · inspect evidence →</p>
+          </button>)}
+          {!patterns.length && <p className="text-muted text-sm">No configured pattern rules matched this population.</p>}
+        </div>
+        {selectedPattern && <div className="mt-4 rounded-xl border p-4">
+          <p className="text-sm font-semibold">{selectedPattern.title}</p><p className="text-muted mt-1 text-xs">{selectedPattern.explanation}</p><p className="mt-2 text-xs"><strong>Next action:</strong> {selectedPattern.action}</p>
+          <div className="mt-3 flex flex-wrap gap-2">{(selectedPattern.owners ?? []).slice(0,5).map((owner)=><span key={owner.name} className="rounded-lg border px-2 py-1 text-xs">{owner.name}: {owner.affected}/{owner.population} leads ({pctStr(owner.rate)})</span>)}</div>
+          <p className="text-faint mt-3 text-xs">Showing {selectedPattern.evidence.length} of {num(selectedPattern.count)} affected leads. Click a lead to review its complete record.</p>
+          <div className="mt-2 max-h-96 overflow-auto">{selectedPattern.evidence.map((item) => <button key={item.leadId} onClick={() => onOpenLead?.(item.leadId)} className="focus-ring block w-full border-t px-2 py-3 text-left hover:bg-[var(--surface-2)]"><p className="text-xs font-semibold">{item.name || item.leadId} · {item.associate}</p><p className="text-muted mt-1 whitespace-pre-wrap text-xs">{item.detail}</p></button>)}</div>
+        </div>}
+      </Card>
 
       <Card title="AI actions">
         <div className="flex flex-wrap gap-1.5">

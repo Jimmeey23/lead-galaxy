@@ -1,4 +1,4 @@
-import { firstConversionSale, CONVERSION_RULE_VERSION } from "./conversion";
+import { firstConversionSale, CONVERSION_RULE_VERSION, isWonStage } from "./conversion";
 import { resolveMomenceHost } from "./momence-host";
 import type { Lead } from "./types";
 
@@ -213,7 +213,9 @@ export function normalise(rows: string[][]): { leads: Lead[]; headers: string[] 
       center: cleanStr(get(row, I.center)) || "Unassigned",
       classType: cleanStr(get(row, I.classType)) || "Unknown",
       hostId: resolveMomenceHost({ center: cleanStr(get(row, I.center)), hostId: cleanStr(get(row, I.hostId)) }),
-      status: cleanStr(get(row, I.status)) || "Unknown",
+      status: isWonStage(cleanStr(get(row, I.stage))) ? "Won" : /^won$/i.test(cleanStr(get(row, I.status))) ? "Open" : cleanStr(get(row, I.status)) || "Unknown",
+      rawStatus: cleanStr(get(row, I.status)),
+      won: isWonStage(cleanStr(get(row, I.stage))),
       channel: cleanStr(get(row, I.channel)) || "Unknown",
       period: cleanStr(get(row, I.period)),
       utmSource: cleanStr(get(row, I.us)),
@@ -224,12 +226,14 @@ export function normalise(rows: string[][]): { leads: Lead[]; headers: string[] 
       purchases,
       ltv,
       visits,
-      trialStatus: trialStatus || "Unknown",
+      trialStatus: "Unverified",
+      rawTrialStatus: trialStatus || "Unknown",
       conversionStatus: "Unverified",
       rawConversionStatus: conversionStatus || "Unknown",
       retentionStatus: retentionStatus || "Unknown",
       converted: false,
-      tried: !!trialStatus && !/^not tried$/i.test(trialStatus) && !/unknown/i.test(trialStatus),
+      tried: false,
+      trialCompletedAt: null,
       retained: /retained/i.test(retentionStatus) && !/^not/i.test(retentionStatus),
       followUpCount: recorded.length,
       firstFollowUp,
@@ -271,6 +275,7 @@ export function enrichWithCrossSheet(
   leads: Lead[],
   sales: Map<string, import("./crossSheet").SaleAgg>,
   checkins: Map<string, import("./crossSheet").CheckinAgg>,
+  checkinsAvailable = true,
 ) {
   let enrichedCount = 0;
   let totalLtv = 0;
@@ -285,7 +290,7 @@ export function enrichWithCrossSheet(
     l.rawLtv = l.ltv;
     l.rawPurchases = l.purchases;
     l.rawVisits = l.visits;
-    l.rawTrialStatus = l.trialStatus;
+    l.rawTrialStatus ??= l.trialStatus;
     l.rawConversionStatus ??= l.conversionStatus;
     l.rawRetentionStatus = l.retentionStatus;
     l.crossSheetFlags = l.crossSheetFlags ?? [];
@@ -298,6 +303,12 @@ export function enrichWithCrossSheet(
     l.conversionStatus = qualifying ? "Converted" : "Not Converted";
     l.convertedAt = qualifying?.date ?? null;
     l.daysToConversion = qualifying && l.createdAt ? dayDiff(l.createdAt, qualifying.date) : null;
+    const memberCheckins = l.memberId ? checkins.get(l.memberId) : undefined;
+    const visitDate = l.createdAt && memberCheckins?.memberId === l.memberId
+      ? memberCheckins.checkedInDates.filter((date) => date >= l.createdAt!).sort()[0] : undefined;
+    l.tried = !!visitDate;
+    l.trialStatus = !checkinsAvailable ? "Unverified" : visitDate ? "Trial Completed" : "Not Tried";
+    l.trialCompletedAt = visitDate ?? null;
     if (!sale && !chk) continue;
 
     let hasTruth = false;
@@ -322,19 +333,6 @@ export function enrichWithCrossSheet(
       l.lastVisitDate = chk.lastVisit;
       hasTruth = true;
       totalVisits += chk.visits;
-      // trial from checkins
-      if (chk.trialVisits > 0) {
-        l.trialStatus = "Trial Completed";
-        l.tried = true;
-      } else if (chk.visits === 0) {
-        l.trialStatus = "Not Tried";
-        l.tried = false;
-      } else {
-        // if visits but no trial signal, infer trial completed if any visit is trial? else Not Tried
-        // we keep Not Tried unless trialVisits >0
-        l.trialStatus = chk.trialVisits > 0 ? "Trial Completed" : "Not Tried";
-        l.tried = chk.trialVisits > 0;
-      }
       // retention: at least 3 visits or 2 purchases + last visit within 90d
       const isRetained = chk.visits >= 5 || (chk.visits >= 3 && (l.purchases ?? 0) >= 2);
       l.retained = isRetained;
@@ -378,7 +376,8 @@ async function doFetch() {
   try {
     const { fetchCrossSheet } = await import("./crossSheet");
     const cs = await fetchCrossSheet();
-    const { enrichedCount, totalLtv, totalVisits } = enrichWithCrossSheet(leads, cs.sales, cs.checkins);
+    const { enrichedCount, totalLtv, totalVisits } = enrichWithCrossSheet(leads, cs.sales, cs.checkins, cs.checkinsAvailable);
+    if (!cs.checkinsAvailable) enrichmentError = "Check-ins source unavailable; Trial Completed is unverified. Eligible sales conversion remains verified.";
     crossSheetMeta = {
       salesRows: cs.stats.salesRows,
       checkinRows: cs.stats.checkinRows,
@@ -420,5 +419,10 @@ export async function getLeads(force = false): Promise<Cache> {
 
 export function patchLead(id: string, patch: Partial<Lead>) {
   const l = cache.leads.find((x) => x.id === id);
-  if (l) Object.assign(l, patch);
+  if (l) {
+    Object.assign(l, patch);
+    l.won = isWonStage(l.stageName);
+    if (l.won) l.status = "Won";
+    else if (/^won$/i.test(l.status.trim())) l.status = "Open";
+  }
 }

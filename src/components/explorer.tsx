@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   ArrowDownUp,
@@ -128,70 +129,58 @@ function InlineFU({ lead }: { lead: Lead }) {
   const [draftDate, setDraftDate] = useState("");
   const [draftComment, setDraftComment] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hover, setHover] = useState<{index:number;left:number;top:number} | null>(null);
   const { bumpRefresh } = useApp();
-
-  const startEdit = (idx: number) => {
-    setOpenIdx(idx);
-    setDraftDate(lead.followUps[idx]?.date ?? "");
-    setDraftComment(lead.followUps[idx]?.comment ?? "");
+  const startEdit = (index: number) => {
+    setOpenIdx(index); setHover(null); setError(null);
+    setDraftDate(lead.followUps[index]?.date ?? "");
+    setDraftComment(lead.followUps[index]?.comment ?? "");
   };
-
-  const save = async (idx: number) => {
-    setSaving(true);
+  const preview = (index: number, target: HTMLElement) => {
+    const rect = target.getBoundingClientRect();
+    setHover({index,left:Math.max(8,Math.min(rect.left,window.innerWidth-350)),top:Math.max(8,Math.min(rect.bottom+8,window.innerHeight-210))});
+  };
+  const save = async () => {
+    if (openIdx === null) return;
+    setSaving(true); setError(null);
     try {
-      await fetch("/api/followups", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id: lead.id, index: idx, date: draftDate, comment: draftComment }),
+      const response = await fetch(new URL("/api/followups", window.location.origin).href, {
+        method:"PUT", headers:{"content-type":"application/json"},
+        body:JSON.stringify({id:lead.id,index:openIdx,date:draftDate,comment:draftComment}),
       });
-      bumpRefresh();
-      setOpenIdx(null);
-    } finally { setSaving(false); }
+      const result = await response.json();
+      if (!response.ok || !result.ok || !result.momence?.ok) throw new Error(result.error || result.momence?.message || "Follow-up was not saved. Please retry.");
+      bumpRefresh(); setOpenIdx(null);
+    } catch (failure) { setError(failure instanceof Error ? failure.message : "Follow-up could not be saved."); }
+    finally { setSaving(false); }
   };
-
-  return (
-    <span className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-      {[0, 1, 2, 3].map((i) => {
-        const fu = lead.followUps[i];
-        const done = !!fu?.date;
-        const badge = cadenceBadge(lead);
-        const overdueForThis = !done && badge.label.includes(`FU${i + 1}`) && badge.tone === "critical";
-        return (
-          <Popover key={i} width={320} trigger={() => (
-            <button onClick={() => startEdit(i)} className="flex h-7 w-7 items-center justify-center rounded-full border text-[11px] font-semibold transition-all" style={{
-              background: done ? "var(--positive)" : overdueForThis ? "var(--critical-soft)" : "var(--surface-2)",
-              color: done ? "#fff" : overdueForThis ? "var(--critical)" : "var(--text-muted)",
-              borderColor: done ? "var(--positive)" : overdueForThis ? "var(--critical)" : "var(--border)",
-              boxShadow: done ? "0 2px 6px rgba(15,122,77,0.22)" : undefined,
-            }} title={done ? `${fu.date} — ${fu.comment || "no comment"}` : overdueForThis ? "Overdue — click to add" : `Add FU${i + 1}`}>
-              {done ? <Check size={11} /> : i + 1}
-            </button>
-          )}>
-            {() => (
-              <div className="p-1">
-                <p className="mb-2 text-[12px] font-semibold">Follow-up {i + 1} {done && <span className="text-muted font-normal">· {fmtDate(fu.date)}</span>}</p>
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-faint mb-1 text-[11px]">Date</p>
-                    <Input type="date" value={draftDate} onChange={(e) => setDraftDate(e.target.value)} />
-                  </div>
-                  <div>
-                    <p className="text-faint mb-1 text-[11px]">Comment</p>
-                    <Input value={draftComment} placeholder="What happened?" onChange={(e) => setDraftComment(e.target.value)} />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="primary" size="sm" disabled={saving} onClick={() => save(i)}>{saving ? "Saving…" : done ? "Update" : "Save"}</Button>
-                    <Button variant="ghost" size="sm" onClick={() => setOpenIdx(null)}>Cancel</Button>
-                  </div>
-                  {fu?.comment && <p className="text-muted rounded-lg px-2 py-1 text-[11.5px]" style={{ background: "var(--surface-2)" }}>{fu.comment}</p>}
-                </div>
-              </div>
-            )}
-          </Popover>
-        );
-      })}
-    </span>
-  );
+  return <span className="inline-flex items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
+    {[0,1,2,3].map((index) => {
+      const fu=lead.followUps[index];
+      return <button key={index} type="button" className="fu-button focus-ring transition-colors hover:border-[var(--accent)]" data-recorded={!!(fu?.date || fu?.comment)}
+        aria-label={`Follow-up ${index+1} for ${lead.fullName || lead.id}: ${fu?.date || "No date"}. ${fu?.comment || "No comments"}. Click to add or edit.`}
+        title={`FU${index+1} · ${fu?.date || "No date"}\n${fu?.comment || "No comments yet — click to add"}`}
+        onMouseEnter={(event) => preview(index,event.currentTarget)} onMouseLeave={() => setHover(null)}
+        onFocus={(event) => preview(index,event.currentTarget)} onBlur={() => setHover(null)} onClick={() => startEdit(index)}>{index+1}</button>;
+    })}
+    {hover && openIdx === null && createPortal(<div role="tooltip" className="pointer-events-none fixed z-[110] w-[330px] max-w-[calc(100vw-16px)] rounded-xl border p-3 text-xs" style={{left:hover.left,top:hover.top,background:"var(--bg-elevated)",boxShadow:"var(--shadow-lg)"}}>
+      <p className="font-semibold">Follow-up {hover.index+1} · {lead.followUps[hover.index]?.date ? fmtDate(lead.followUps[hover.index].date) : "No date recorded"}</p>
+      <p className="text-muted mt-2 max-h-36 overflow-hidden whitespace-pre-wrap">{lead.followUps[hover.index]?.comment || "No comments yet. Click to add."}</p><p className="mt-2 text-[var(--accent)]">Click to add or edit →</p>
+    </div>,document.body)}
+    {openIdx !== null && createPortal(<div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => {if(event.key === "Escape" && !saving) setOpenIdx(null);}}>
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={() => !saving && setOpenIdx(null)} />
+      <form role="dialog" aria-modal="true" aria-labelledby={`fu-title-${lead.id}`} onSubmit={(event) => {event.preventDefault();void save();}} className="relative w-full max-w-md rounded-2xl border p-5" style={{background:"var(--bg-elevated)",boxShadow:"var(--shadow-lg)"}}>
+        <h2 id={`fu-title-${lead.id}`} className="text-base font-semibold">Follow-up {openIdx+1}</h2><p className="text-muted mb-4 text-xs">{lead.fullName || lead.id} · changes sync to Momence</p>
+        <label className="mb-1 block text-xs font-medium" htmlFor={`fu-date-${lead.id}`}>Follow-up date</label>
+        <Input id={`fu-date-${lead.id}`} type="date" value={draftDate} onChange={(event) => setDraftDate(event.target.value)} />
+        <label className="mb-1 mt-4 block text-xs font-medium" htmlFor={`fu-comment-${lead.id}`}>Comments and member response</label>
+        <textarea autoFocus id={`fu-comment-${lead.id}`} value={draftComment} onChange={(event) => setDraftComment(event.target.value)} rows={5} className="focus-ring w-full resize-y rounded-xl border p-3 text-sm" style={{background:"var(--surface)"}} placeholder="Record the conversation, outcome and next agreed action…" />
+        {error && <p role="alert" className="mt-3 text-xs" style={{color:"var(--critical)"}}>{error}</p>}
+        <div className="mt-4 flex justify-end gap-2"><Button type="button" variant="ghost" disabled={saving} onClick={() => setOpenIdx(null)}>Cancel</Button><Button type="submit" variant="primary" disabled={saving}>{saving ? "Saving…" : "Save follow-up"}</Button></div>
+      </form>
+    </div>,document.body)}
+  </span>;
 }
 
 export function LeadExplorer() {
@@ -474,7 +463,7 @@ function GroupRows({ node, expanded, toggle, onLead }: { node: GroupNode; expand
   );
 }
 
-const BULK_FIELDS = ["associate", "center", "classType", "stageName", "status", "trialStatus", "retentionStatus", "remarks"];
+const BULK_FIELDS = ["associate", "center", "classType", "stageName", "status", "retentionStatus", "remarks"];
 
 function BulkEditDrawer({ open, ids, onClose, onDone }: { open: boolean; ids: string[]; onClose: () => void; onDone: () => void }) {
   const [patch, setPatch] = useState<Record<string, string>>({});

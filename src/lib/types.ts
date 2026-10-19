@@ -31,6 +31,9 @@ export type Lead = {
   retentionStatus: string;
   // derived
   converted: boolean;
+  won: boolean;
+  trialCompletedAt?: string | null;
+  rawStatus?: string;
   tried: boolean;
   retained: boolean;
   followUpCount: number;

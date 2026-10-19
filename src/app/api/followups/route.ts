@@ -13,26 +13,19 @@ export async function PUT(req: Request) {
     date?: string;
     comment?: string;
   };
-  if (index < 0 || index > 3) return NextResponse.json({ error: "index must be 0-3" }, { status: 400 });
+  if (!Number.isInteger(index) || index < 0 || index > 3) return NextResponse.json({ error: "index must be 0-3" }, { status: 400 });
   const cache = await getLeads();
   const lead = cache.leads.find((l) => l.id === id);
   if (!lead) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
 
-  const cleanD = date ? cleanDate(date) : null;
+  if (typeof id !== "string" || (date !== undefined && typeof date !== "string") || (comment !== undefined && typeof comment !== "string")) return NextResponse.json({error:"Invalid follow-up values"},{status:400});
+  const cleanD = date === undefined ? lead.followUps[index]?.date ?? null : date ? cleanDate(date) : null;
+  if (date && !cleanD) return NextResponse.json({error:"Invalid follow-up date"},{status:400});
   const patchKeyDate = ["fu1D", "fu2D", "FU3D", "fu4D"][index];
   const patchKeyComm = ["fu1C", "fu2C", "FU3C", "fu4C"][index];
 
-  // local optimistic update
   const newFu = [...lead.followUps];
   newFu[index] = { date: cleanD, comment: (comment ?? newFu[index]?.comment ?? "").trim() };
-  const recorded = newFu.filter((f) => f.date || f.comment);
-  const fuDates = newFu.map((f) => f.date).filter((d): d is string => !!d).sort();
-  patchLead(id, {
-    followUps: newFu,
-    followUpCount: recorded.length,
-    firstFollowUp: fuDates[0] ?? null,
-    daysToFirstFollowUp: lead.createdAt && fuDates[0] ? Math.round((new Date(fuDates[0] + "T00:00:00Z").getTime() - new Date(lead.createdAt + "T00:00:00Z").getTime()) / 86400000) : null,
-  } as unknown as Partial<import("@/lib/types").Lead>);
 
   // forward to Momence (same logic as momence route but only FU fields)
   const configured = momenceConfigured();
@@ -83,8 +76,13 @@ export async function PUT(req: Request) {
       momence = { ok: false, message: (e as Error).message };
     }
   } else {
-    momence = { ok: false, message: "MOMENCE_ALL_COOKIES not configured — saved locally only" };
+    momence = { ok: false, message: "Momence is not configured. Follow-up was not saved." };
   }
 
-  return NextResponse.json({ ok: true, lead: { ...lead, followUps: newFu }, momence });
+  if (!momence?.ok) return NextResponse.json({ok:false,error:momence?.message || "Momence update failed",momence},{status:502});
+  const recorded = newFu.filter((followup) => followup.date || followup.comment);
+  const dates = newFu.flatMap((followup) => followup.date ? [followup.date] : []).sort();
+  patchLead(id, {followUps:newFu,followUpCount:recorded.length,firstFollowUp:dates[0] ?? null,
+    daysToFirstFollowUp:lead.createdAt && dates[0] ? Math.round((Date.parse(dates[0])-Date.parse(lead.createdAt))/86400000) : null});
+  return NextResponse.json({ ok: true, lead, momence });
 }

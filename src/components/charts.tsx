@@ -245,6 +245,7 @@ export function ScatterPlot({
   height?: number;
   onClick?: (name: string) => void;
 }) {
+  const animate = useSyncExternalStore(subscribeMotion, motionSnapshot, serverMotionSnapshot);
   return (
     <ResponsiveContainer width="100%" height={height}>
       <ScatterChart margin={{ top: 10, right: 16, left: -8, bottom: 10 }}>
@@ -276,11 +277,11 @@ export function ScatterPlot({
             );
           }}
         />
-        <Scatter
+        <Scatter isAnimationActive={animate} animationDuration={850}
           data={data}
           fill="var(--chart-1)"
           fillOpacity={0.7}
-          onClick={(d: unknown) => onClick?.((d as { name: string }).name)}
+          onClick={(d: unknown) => { const point = d as {name?:string;payload?:{name?:string}}; const name=point.name ?? point.payload?.name; if(name) onClick?.(name); }}
           cursor={onClick ? "pointer" : undefined}
         />
       </ScatterChart>

@@ -18,7 +18,6 @@ export const EDITABLE: { field: keyof Lead; label: string; momence: string }[] =
   { field: "classType", label: "Class Type", momence: "type" },
   { field: "stageName", label: "Stage Name", momence: "stage" },
   { field: "status", label: "Status", momence: "status" },
-  { field: "trialStatus", label: "Trial Status", momence: "trialStatus" },
   { field: "retentionStatus", label: "Retention Status", momence: "retentionStatus" },
 ];
 

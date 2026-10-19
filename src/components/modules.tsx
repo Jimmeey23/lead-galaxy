@@ -142,7 +142,7 @@ export function GroupTable({
 }
 
 /* --------------------------------- Overview -------------------------------- */
-export function Overview({ a, drill, goExplorer, gran, setGran }: { a: Analytics; drill: (p: Partial<FilterState>) => void; goExplorer: () => void; gran: string; setGran: (value: string) => void }) {
+export function Overview({ a, drill, goExplorer }: { a: Analytics; drill: (p: Partial<FilterState>) => void; goExplorer: () => void }) {
   const c = a.compare?.kpis;
   const k = a.kpis;
   const cmp = (f: (x: Kpis) => number) => (c ? { current: f(k), previous: f(c) } : null);
@@ -162,56 +162,28 @@ export function Overview({ a, drill, goExplorer, gran, setGran }: { a: Analytics
         </div>
       )}
 
-      {/* AI Pulse row */}
-      <div className="grid gap-3 lg:grid-cols-4">
-        <div className="metric-card p-4" style={{ borderColor: "color-mix(in srgb, var(--accent) 18%, var(--border))" }}>
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}><Bot size={16} /></span>
-            <div>
-              <p className="text-[11px] font-semibold tracking-wide uppercase" style={{ color: "var(--accent)" }}>AI Pulse</p>
-              <p className="text-[12px] font-medium">{ai.summary.overdue + ai.summary.missed} cadence breaks · {ai.summary.discrepancyCount} discrepancies</p>
-            </div>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            <Chip tone="critical">{ai.summary.missed} missed</Chip>
-            <Chip tone="warning">{ai.summary.overdue} overdue</Chip>
-            <Chip tone="info">{ai.summary.dueToday} due today</Chip>
-          </div>
-        </div>
-        <GraphicKpi label="Avg risk score" value={`${ai.summary.avgRisk.toFixed(0)}/100`} sub="higher = more leakage risk" icon={<ShieldAlert size={15} />} tone={ai.summary.avgRisk > 60 ? "critical" : ai.summary.avgRisk > 35 ? "warning" : "positive"} compare={null} spark={<span className="text-faint text-[11px]">{ai.summary.notStarted} never contacted</span>} />
-        <GraphicKpi label="Avg opportunity" value={`${ai.summary.avgOpportunity.toFixed(0)}/100`} sub="reactivation readiness" icon={<Target size={15} />} tone="positive" />
-        <GraphicKpi label="Cadence complete" value={`${ai.summary.complete.toLocaleString()}`} sub={`${pctStr((ai.summary.complete / (ai.summary.total || 1)) * 100)} of population`} icon={<Timer size={15} />} tone="info" />
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-2.5" style={{background:"var(--surface-2)"}}>
+        <p className="text-xs"><strong>{num(ai.summary.overdue + ai.summary.missed)}</strong> follow-ups need attention · <strong>{num((ai.patterns?.length ?? 0))}</strong> intelligence patterns detected</p>
+        <span className="text-muted text-xs">Won = Membership Sold stage · conversion = eligible sale</span>
       </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-        <GraphicKpi label="Total leads" value={num(k.totalLeads)} sub="distinct lead IDs" icon={<Users size={14} />} tone="accent" compare={cmp((x) => x.totalLeads)} onClick={goExplorer} trend={a.series.map((point) => point.leads)} />
-        <GraphicKpi label="Converted" value={num(k.converted)} sub={`${pctStr(k.conversionRate)} of leads`} icon={<BadgeCheck size={14} />} tone="positive" compare={cmp((x) => x.converted)} onClick={() => drill({ conversionStatus: ["Converted"] })} trend={a.series.map((point) => point.converted)} />
-        <GraphicKpi label="Conversion rate" value={pctStr(k.conversionRate)} sub="converted ÷ total" icon={<TrendingUp size={14} />} tone="info" compare={cmp((x) => x.conversionRate)} trend={a.series.map((point) => point.conversionRate)} onClick={() => drill({ conversionStatus: ["Converted"] })} />
-        <GraphicKpi label="Trial leads" value={num(k.trials)} sub={`${pctStr(k.trialRate)} participation`} icon={<Activity size={14} />} tone="info" compare={cmp((x) => x.trials)} trend={a.series.map((point) => point.trials)} onClick={() => drill({ trialStatus: ["Trial Completed"] })} />
-        <GraphicKpi label="Trial rate" value={pctStr(k.trialRate)} sub="trial ÷ total" icon={<Activity size={14} />} tone="accent" trend={a.series.map((point) => point.leads ? point.trials / point.leads * 100 : 0)} onClick={() => drill({ trialStatus: ["Trial Completed"] })} />
-        <GraphicKpi label="Total purchases" value={num(k.purchases)} sub="from Sales sheet truth" icon={<Wallet size={14} />} tone="positive" compare={cmp((x) => x.purchases)} onClick={() => drill({ purchasesMin: 1 })} />
-        <GraphicKpi label="Total LTV" value={inrCompact(k.totalLtv)} sub="Sales-truth value" icon={<Wallet size={14} />} tone="positive" compare={cmp((x) => x.totalLtv)} trend={a.series.map((point) => point.ltv)} onClick={() => drill({ ltvMin: 0.01 })} />
-        <GraphicKpi label="Avg LTV / lead" value={inr(k.avgLtvPerLead)} sub="across all leads" icon={<Wallet size={14} />} tone="warning" compare={cmp((x) => x.avgLtvPerLead)} trend={a.series.map((point) => point.leads ? point.ltv / point.leads : 0)} onClick={goExplorer} />
-        <GraphicKpi label="Avg LTV / converted" value={inr(k.avgLtvPerConverted)} sub="converted only" icon={<Wallet size={14} />} tone="warning" onClick={() => drill({ conversionStatus: ["Converted"] })} />
-        <GraphicKpi label="Total visits" value={num(k.visits)} sub="from Check-ins truth" icon={<Eye size={14} />} tone="info" compare={cmp((x) => x.visits)} onClick={() => drill({ visitsMin: 1 })} />
-        <GraphicKpi label="Avg time to conversion" value={days(k.avgTimeToConversion)} invert sub="creation → conversion" icon={<Timer size={14} />} tone="info" compare={k.avgTimeToConversion != null && c?.avgTimeToConversion != null ? { current: k.avgTimeToConversion, previous: c.avgTimeToConversion } : null} onClick={() => drill({ conversionStatus: ["Converted"] })} />
-        <GraphicKpi label="Follow-up coverage" value={pctStr(k.followUpCoverage)} sub="≥1 recorded FU" icon={<Phone size={14} />} tone="accent" compare={cmp((x) => x.followUpCoverage)} onClick={() => drill({ followUpActivity: "withFollowUps" })} />
-        <GraphicKpi label="Retained" value={num(k.retained)} sub={`${pctStr(k.retentionRate)} of converted`} icon={<Building2 size={14} />} tone="positive" compare={cmp((x) => x.retained)} onClick={() => drill({ retentionStatus: ["Retained"] })} />
-        <GraphicKpi label="Avg FU / lead" value={num(k.avgFollowUps, 2)} sub="mean follow-ups" icon={<Phone size={14} />} tone="accent" onClick={goExplorer} />
-        <GraphicKpi label="Avg days to 1st FU" value={days(k.avgDaysToFirstFollowUp)} invert icon={<Timer size={14} />} tone="warning" onClick={() => drill({ followUpActivity: "withFollowUps" })} />
+      <div className="overview-metrics grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <GraphicKpi label="Total leads" value={num(k.totalLeads)} sub="distinct lead IDs" icon={<Users size={14} />} compare={cmp((x) => x.totalLeads)} trend={a.series.map((point) => point.leads)} onClick={goExplorer} />
+        <GraphicKpi label="Trial completed" value={num(k.trials)} sub="verified checked-in visit" icon={<Activity size={14} />} tone="info" compare={cmp((x) => x.trials)} onClick={() => drill({trialStatus:["Trial Completed"]})} />
+        <GraphicKpi label="Eligible conversions" value={num(k.converted)} sub="same Member ID · eligible sale" icon={<BadgeCheck size={14} />} tone="positive" compare={cmp((x) => x.converted)} onClick={() => drill({conversionStatus:["Converted"]})} />
+        <GraphicKpi label="Won leads" value={num(k.won)} sub="stage: Membership Sold" icon={<Target size={14} />} tone="info" compare={cmp((x) => x.won)} onClick={() => drill({status:["Won"]})} />
+        <GraphicKpi label="Conversion rate" value={pctStr(k.conversionRate)} sub="eligible conversions ÷ leads" icon={<TrendingUp size={14} />} tone="positive" trend={a.series.map((point) => point.conversionRate)} onClick={() => drill({conversionStatus:["Converted"]})} />
+        <GraphicKpi label="Follow-up coverage" value={pctStr(k.followUpCoverage)} sub="at least one dated note or comment" icon={<Phone size={14} />} compare={cmp((x) => x.followUpCoverage)} onClick={() => drill({followUpActivity:"withFollowUps"})} />
+        <GraphicKpi label="Lifetime sales value" value={inrCompact(k.totalLtv)} sub="all successful sales · not period revenue" icon={<Wallet size={14} />} tone="info" onClick={() => drill({ltvMin:0.01})} />
+        <GraphicKpi label="Follow-ups due today" value={num(ai.summary.dueToday)} sub="review the Follow-ups workspace" icon={<Timer size={14} />} tone="warning" />
       </div>
-      <Card title="Lead acquisition & conversion trend" subtitle="Lead creation cohorts · click a period to explore its leads" actions={<Toggle size="sm" value={gran} onChange={setGran} options={[{ value: "day", label: "Day" }, { value: "week", label: "Week" }, { value: "month", label: "Month" }]} />}>
-        <TrendChart height={300} onDrill={(date) => {
-          const from = date.length === 7 ? `${date}-01` : date;
-          const end = new Date(`${from}T00:00:00Z`);
-          if (gran === "month") end.setUTCMonth(end.getUTCMonth() + 1, 0);
-          else if (gran === "week") end.setUTCDate(end.getUTCDate() + 6);
-          drill({ preset: "Custom Range", dateDimension: "createdAt", from, to: end.toISOString().slice(0, 10) });
-        }} data={a.series as unknown as Record<string, string | number>[]} series={[{ key: "leads", name: "Leads", color: "var(--chart-1)", type: "area" }, { key: "converted", name: "Converted", color: "var(--chart-3)", type: "area" }, { key: "conversionRate", name: "Conv. rate %", color: "var(--chart-2)", type: "line", yAxis: "right" }]} />
+      <Card title="Studio opportunity map" subtitle="Lead volume × eligible conversion rate · bubble size = lifetime sales value · click a studio to explore">
+        <ScatterPlot height={270} data={a.groups.center.map((group) => ({name:group.key,x:group.leads,y:group.conversionRate,z:Math.max(0,group.ltv)}))} xName="Leads" yName="Eligible conversion" onClick={(name) => drill({center:[name]})} />
+        <div className="mt-3 flex flex-wrap gap-2">{a.groups.center.map((group) => <button key={group.key} onClick={() => drill({center:[group.key]})} className="focus-ring rounded-full border px-3 py-1.5 text-xs hover:bg-[var(--surface-2)]">{group.key} · {group.leads} leads · {pctStr(group.conversionRate)}</button>)}</div>
+        <p className="text-muted mt-3 text-xs">Explore high-volume studios with lower conversion first. Differences may reflect source mix and cohort maturity; small populations are not reliable performance rankings.</p>
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card title="Lead-to-customer funnel" subtitle="Current-status view blended with cross-sheet truth">
+        <Card title="Journey milestones" subtitle="Independent populations · visits, eligible purchases and stage outcomes can occur in different orders">
           <FunnelBars funnel={a.funnel} />
         </Card>
         <Card title="Channel contribution" subtitle="Leads by acquisition channel — click to drill">
@@ -240,12 +212,11 @@ export function FunnelBars({ funnel }: { funnel: Analytics["funnel"] }) {
         <div key={s.stage}>
           <div className="mb-1.5 flex items-baseline justify-between text-[12.5px]">
             <span className="font-medium">{s.stage}</span>
-            <span className="num text-muted">{num(s.value)} · {pctStr(s.ofTotal)} of leads{i > 0 && <span className="text-faint"> · step {pctStr(s.stepRate)}</span>}</span>
+            <span className="num text-muted">{num(s.value)} · {pctStr(s.ofTotal)} of leads</span>
           </div>
           <div className="h-7 w-full overflow-hidden rounded-full" style={{ background: "var(--surface-2)" }}>
             <div className="h-full rounded-full transition-all duration-700" style={{ width: `${(s.value / max) * 100}%`, background: PALETTE[i % PALETTE.length] }} />
           </div>
-          {i > 0 && s.dropOff > 0 && <p className="text-faint mt-1 text-[11px]">Drop-off from previous stage: <span className="num">{num(s.dropOff)}</span> leads</p>}
         </div>
       ))}
     </div>
@@ -533,9 +504,10 @@ export function QualityModule({ a }: { a: Analytics }) {
           {[
             ["Total Leads", "Count of distinct, valid lead IDs within the active filtered population."],
             ["Conversion Rate (Sales-truth)", CONVERSION_DEFINITION],
+            ["Won", "Stage Name equals Membership Sold (ignoring case and extra whitespace). Won is distinct from eligible paid conversion."],
             ["Total LTV (Sales-truth)", "Sum of Payment Value for succeeded, non-voided sales joined on Member ID or Email."],
             ["Visits (Check-ins truth)", "Count of Checked In = TRUE rows for that Member ID joined from the Check-ins sheet."],
-            ["Trial Status (Check-ins truth)", "Trial Completed if any check-in for that member is a trial class; otherwise Not Tried."],
+            ["Trial Status (Check-ins truth)", "Trial Completed requires a Checked In = TRUE visit for the exact Member ID on or after lead creation; source trial labels and email matches do not qualify."],
             ["Retention (Check-ins + Sales)", "Retained when visits ≥5 or (visits ≥3 and purchases ≥2) — configurable heuristic."],
             ["Avg Time to Conversion", "Mean days between lead creation and the first eligible post-creation sale for the exact same Member ID."],
             ["Follow-up Coverage", "Share with ≥1 recorded follow-up date/comment; a record is not proof of contact."],

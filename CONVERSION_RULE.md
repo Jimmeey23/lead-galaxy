@@ -1,12 +1,12 @@
 # Lead conversion rule
 
-Version: `member-eligible-sale-v1`
+Version: `member-eligible-sale-v3`
 
 A lead is Converted only if at least one Sales row meets all of these conditions:
 
 1. Nonempty Member ID exactly matches the lead's Member ID. Email is not a fallback.
 2. Payment Status is Succeeded, Sec. Is Voided is not TRUE, and Payment Value is positive.
-3. Payment Date is on a calendar date strictly after the lead's Created At date. The lead source currently provides date-only creation values; same-day purchases therefore do not qualify.
+3. Payment Date is on a calendar date on or after the lead's Created At date. Same-day purchases qualify.
 4. The purchase is not Retail or a Money Credits product.
 5. The membership/product name does not contain 2 For 1, Intro Pack, Copper & Cloves Single Class Package, or Copper + Cloves Credit. Matching ignores case and normalizes whitespace, punctuation, hyphens, `&`, and `+`.
 
@@ -22,5 +22,13 @@ Validation:
 
 - `node scripts/test-conversion.cjs`
 - `npm run typecheck`
-- Independent source reconciliation on 19 October 2026: 2,701 conversions / 25,463 leads (10.61%) all time; 2 / 99 (2.02%) for leads created 13–19 October 2026. These are snapshot results, not fixed targets.
-- Converted drilldown: 2,701 rows, agreeing with the KPI; manual status override rejected with HTTP 400 before contacting Momence.
+- Source reconciliation must use the current rule version, which includes same-day purchases. Previous strictly-later-day snapshot counts are superseded.
+- Conversion and trial statuses are derived and cannot be manually overridden.
+
+## Trial completion and Won
+
+Trial Completed requires an exact Member ID match with a Check-ins row where Checked In is TRUE and Date (IST) is on or after lead creation. Product names, complimentary status, email matches and source trial labels do not establish attendance. The first qualifying date is saved as Trial Completed At. A Check-ins source failure produces Unverified attendance, not a confirmed Not Tried result.
+
+Won is a separate stage-based measure: Stage Name equals Membership Sold, ignoring case and repeated whitespace. A Won lead can remain unconverted if its purchases do not meet the eligible-sales rule. Current source Status is retained in rawStatus for provenance.
+
+Pattern intelligence uses transparent review rules for stage/evidence conflicts, repeated and templated comments, date sequencing, incomplete outcomes and attendance/comment conflicts. Findings include counts, affected IDs, owner-normalized rates and up to 100 evidence examples per finding. They do not prove that a copied template or stage is incorrect.

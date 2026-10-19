@@ -64,7 +64,7 @@ function Shell() {
   const [syncing, setSyncing] = useState(false);
   const [aiLeadId, setAiLeadId] = useState<string | null>(null);
 
-  const [granularity, setGranularity] = useState("month");
+  const granularity = "month";
   const body = useMemo(() => ({ filters, granularity }), [filters, granularity]);
   const { data, loading, error } = usePost<Analytics>("/api/analytics", body, [refreshKey]);
 
@@ -181,7 +181,7 @@ function Shell() {
           {!data && loading && <Loading />}
           {data && (
             <>
-              {module === "overview" && <Overview a={data} gran={granularity} setGran={setGranularity} drill={drill} goExplorer={() => setModule("explorer")} />}
+              {module === "overview" && <Overview a={data} drill={drill} goExplorer={() => setModule("explorer")} />}
               {module === "ai" && <AIView a={data} drill={drill} onOpenLead={(id) => {
                 // open lead drawer by fetching lead detail via API (we'll reuse LeadDrawer's data via analytics? quick fetch)
                 // we can fetch lead row via /api/leads and open drawer

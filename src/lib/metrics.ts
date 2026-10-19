@@ -2,6 +2,7 @@ import type { Lead } from "./types";
 
 export type Kpis = {
   totalLeads: number;
+  won: number;
   converted: number;
   conversionRate: number;
   trials: number;
@@ -38,6 +39,7 @@ export function computeKpis(leads: Lead[]): Kpis {
     .filter((d): d is number => d != null && d >= 0 && d <= 365);
   return {
     totalLeads: total,
+    won: unique.filter((lead) => lead.won).length,
     converted: conv.length,
     conversionRate: pct(conv.length, total),
     trials: trials.length,

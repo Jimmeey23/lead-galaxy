@@ -214,3 +214,11 @@ tbody tr { transition: background-color 0.12s ease; }
 @keyframes trace-line { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes metric-enter { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .kpi-card, .kpi-sparkline polyline { animation: none; } }
+
+/* Lean overview: eight metrics, two rows at desktop width. */
+.overview-metrics .kpi-card { min-height: 112px; padding: 13px 15px; border-radius: 14px; box-shadow: 0 3px 14px rgba(28,39,55,.045); }
+.overview-metrics .kpi-card .kpi-value { font-size: 26px; font-weight: 600; letter-spacing: -.035em; }
+.overview-metrics .kpi-detail { border-top: none; padding-top: 0; margin-top: 7px; font-size: 11px; }
+.overview-metrics .kpi-icon { border: 0 !important; box-shadow: none; background: var(--surface-2) !important; }
+.fu-button { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 9px; font-size: 12px; font-weight: 600; }
+.fu-button[data-recorded="true"] { background: var(--accent-soft); color: var(--accent); border-color: color-mix(in srgb,var(--accent) 25%,var(--border)); }

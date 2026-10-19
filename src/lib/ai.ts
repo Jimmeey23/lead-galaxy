@@ -1,3 +1,4 @@
+import { inspectLeadPatterns, type PatternFinding } from "./intelligence-patterns";
 import type { Lead } from "./types";
 import { dayDiff } from "./sheet";
 import { DEFAULT_CADENCE, type CadenceConfig } from "./cadence-config";
@@ -149,6 +150,7 @@ function addDays(iso: string, n: number) {
 export type AILeadRow = ReturnType<typeof cadenceForLead> & { id: string; fullName: string; associate: string; center: string; createdAt: string | null; stageName: string };
 
 export type AIAnalysis = {
+  patterns: PatternFinding[];
   summary: {
     total: number;
     overdue: number;
@@ -174,6 +176,8 @@ export type AIAnalysis = {
 
 export function analyze(leads: Lead[], config: CadenceConfig = DEFAULT_CADENCE): AIAnalysis {
   const today = todayISO();
+  const patterns = inspectLeadPatterns(leads, today);
+  const leadIndex = new Map(leads.map((lead) => [lead.id, lead]));
   const rows: AILeadRow[] = leads.map((l) => {
     try {
       const c = cadenceForLead(l, today, config);
@@ -197,14 +201,14 @@ export function analyze(leads: Lead[], config: CadenceConfig = DEFAULT_CADENCE):
     .slice(0, 100);
 
   const missedOpportunities = [...rows]
-    .filter((r) => !leads.find((l) => l.id === r.id)?.converted && r.opportunityScore >= 70)
+    .filter((r) => !leadIndex.get(r.id)?.converted && r.opportunityScore >= 70)
     .sort((a, b) => b.opportunityScore - a.opportunityScore)
     .slice(0, 100);
 
   const discrepancies: (AILeadRow & { discrepancy: string })[] = [];
   const anomalies: (AILeadRow & { anomaly: string })[] = [];
   for (const r of rows) {
-    const l = leads.find((x) => x.id === r.id)!;
+    const l = leadIndex.get(r.id)!;
     if (r.flags.some((f) => f.includes("Marked converted") || f.includes("Has purchase"))) {
       discrepancies.push({ ...r, discrepancy: r.flags.find((f) => f.includes("Marked") || f.includes("Has purchase"))! });
     }
@@ -245,12 +249,12 @@ export function analyze(leads: Lead[], config: CadenceConfig = DEFAULT_CADENCE):
   };
 
   const recommendations: AIAnalysis["recommendations"] = [];
-  if (missedFollowups.length > leads.length * 0.1) {
+  if (overdue + missed > leads.length * 0.1) {
     recommendations.push({
       title: "Restore follow-up cadence discipline",
-      description: `${missedFollowups.length} leads are overdue or have missed the cadence — more than 10% of the active population.`,
+      description: `${overdue + missed} leads are overdue or have missed the cadence — more than 10% of the active population.`,
       priority: "high",
-      leads: missedFollowups.length,
+      leads: overdue + missed,
       action: "Re-assign overdue FU1s due-today first, then clear the missed backlog by centre.",
     });
   }
@@ -281,6 +285,9 @@ export function analyze(leads: Lead[], config: CadenceConfig = DEFAULT_CADENCE):
       action: "Enforce a 24-hour FU1 SLA at intake; audit new lead assignment.",
     });
   }
+  for (const pattern of patterns.filter((finding) => finding.severity === "high").slice(0,3)) {
+    recommendations.push({title: pattern.title, description: `${pattern.count} leads (${pattern.share.toFixed(1)}% of this population). ${pattern.explanation}`, priority: "high", leads: pattern.count, action: pattern.action});
+  }
   if (!recommendations.length) {
     recommendations.push({
       title: "Maintain current discipline",
@@ -292,6 +299,7 @@ export function analyze(leads: Lead[], config: CadenceConfig = DEFAULT_CADENCE):
   }
 
   return {
+    patterns,
     summary: {
       total: rows.length,
       overdue,

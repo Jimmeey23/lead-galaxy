@@ -25,6 +25,7 @@ export type SaleAgg = {
 export type CheckinAgg = {
   memberId: string;
   email: string;
+  checkedInDates: string[]; // exact member attendance evidence
   visits: number; // Checked In = TRUE
   complementary: number;
   lateCancelled: number;
@@ -147,7 +148,7 @@ export async function fetchCheckinAggs(): Promise<Map<string, CheckinAgg>> {
   try {
     text = await csvFetch(CHECKINS_CSV);
   } catch {
-    return new Map();
+    throw new Error("Check-ins source unavailable; trial completion cannot be verified.");
   }
   const rows = parseCSV(text);
   if (!rows.length) return new Map();
@@ -164,6 +165,7 @@ export async function fetchCheckinAggs(): Promise<Map<string, CheckinAgg>> {
   const iCat = idx["cleaned category"] ?? -1;
   const iIsNew = idx["is new"] ?? -1;
   const iSess = idx["session id"] ?? -1;
+  if ([iMid, iChecked, iDate].some((index) => index < 0)) throw new Error("Check-ins schema changed; attendance cannot be verified.");
 
   const byMember = new Map<string, CheckinAgg>();
   const keyFor = (mid: string, email: string) => mid || email.toLowerCase();
@@ -180,6 +182,7 @@ export async function fetchCheckinAggs(): Promise<Map<string, CheckinAgg>> {
       a = {
         memberId: mid,
         email: email.toLowerCase(),
+        checkedInDates: [],
         visits: 0,
         complementary: 0,
         lateCancelled: 0,
@@ -208,6 +211,7 @@ export async function fetchCheckinAggs(): Promise<Map<string, CheckinAgg>> {
 
     a.visits++;
     if (date) {
+      a.checkedInDates.push(date);
       if (!a.firstVisit || date < a.firstVisit) a.firstVisit = date;
       if (!a.lastVisit || date > a.lastVisit) a.lastVisit = date;
       const m = date.slice(0, 7);
@@ -238,14 +242,20 @@ export type CrossSheetStats = {
 export async function fetchCrossSheet(): Promise<{
   sales: Map<string, SaleAgg>;
   checkins: Map<string, CheckinAgg>;
+  checkinsAvailable: boolean;
   stats: CrossSheetStats;
 }> {
-  const [sales, checkins] = await Promise.all([fetchSalesAggs(), fetchCheckinAggs()]);
+  const [salesResult, checkinsResult] = await Promise.allSettled([fetchSalesAggs(), fetchCheckinAggs()]);
+  if (salesResult.status === "rejected") throw salesResult.reason;
+  const sales = salesResult.value;
+  const checkinsAvailable = checkinsResult.status === "fulfilled";
+  const checkins = checkinsResult.status === "fulfilled" ? checkinsResult.value : new Map<string, CheckinAgg>();
   const salesRows = [...sales.values()].reduce((n, v) => n + v.raw, 0);
   const checkinRows = [...checkins.values()].reduce((n, v) => n + v.visits + v.lateCancelled, 0);
   return {
     sales,
     checkins,
+    checkinsAvailable,
     stats: {
       salesRows,
       checkinRows,
