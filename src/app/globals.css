@@ -198,3 +198,19 @@ tbody tr { transition: background-color 0.12s ease; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* Compact constellation of metrics with one-shot, data-driven motion. */
+.kpi-card { min-height: 118px; padding: 14px 16px; animation: metric-enter 420ms ease-out both; }
+.kpi-card:nth-child(2n) { animation-delay: 45ms; }
+.kpi-card:nth-child(3n) { animation-delay: 90ms; }
+.kpi-card .kpi-value { font-size: clamp(23px, 1.8vw, 29px); margin-top: 7px; }
+.kpi-card .kpi-icon { width: 30px; height: 30px; border-radius: 11px; }
+.kpi-card .kpi-detail { margin-top: 9px; padding-top: 7px; padding-right: 48px; font-size: 11px; }
+.kpi-card .mt-3 { margin-top: 7px; }
+.kpi-card .kpi-label { font-size: 10px; }
+.kpi-sparkline { position: absolute; right: 14px; bottom: 13px; width: 64px; height: 24px; opacity: .65; pointer-events: none; }
+.kpi-sparkline polyline { stroke-dasharray: 1; animation: trace-line 900ms ease-out both; }
+.kpi-card:hover .kpi-sparkline { opacity: 1; }
+@keyframes trace-line { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes metric-enter { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .kpi-card, .kpi-sparkline polyline { animation: none; } }

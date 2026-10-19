@@ -64,7 +64,8 @@ function Shell() {
   const [syncing, setSyncing] = useState(false);
   const [aiLeadId, setAiLeadId] = useState<string | null>(null);
 
-  const body = useMemo(() => ({ filters, granularity: "month" }), [filters]);
+  const [granularity, setGranularity] = useState("month");
+  const body = useMemo(() => ({ filters, granularity }), [filters, granularity]);
   const { data, loading, error } = usePost<Analytics>("/api/analytics", body, [refreshKey]);
 
   const active = NAV.find((n) => n.id === module)!;
@@ -97,16 +98,18 @@ function Shell() {
       >
         <div className="flex items-center gap-3 px-4 py-5">
           <span className="brand-mark flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl">
-            <svg viewBox="0 0 40 40" width="32" height="32" role="img" aria-label="Physique 57 Lead Intelligence">
-              <path d="M8 29V13h7c7 0 7 10 0 10H8" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M22 29v-7m6 7V17m6 12V10" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-              <circle cx="28" cy="9" r="2.5" fill="currentColor" />
+            <svg viewBox="0 0 40 40" width="34" height="34" role="img" aria-label="Lead Galaxy">
+              <ellipse cx="20" cy="20" rx="17" ry="8" transform="rotate(-35 20 20)" fill="none" stroke="currentColor" strokeWidth="1.6" />
+              <ellipse cx="20" cy="20" rx="10" ry="16" transform="rotate(-35 20 20)" fill="none" stroke="currentColor" strokeWidth="1.2" opacity=".45" />
+              <circle cx="20" cy="20" r="5" fill="currentColor" />
+              <circle cx="33" cy="11" r="3" fill="currentColor" />
+              <path d="M9 5v6M6 8h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
           </span>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="display truncate text-[13.5px] font-semibold leading-tight">Physique 57 India</p>
-              <p className="text-faint text-[11px] leading-tight">Lead Intelligence Platform</p>
+              <p className="display truncate text-[13.5px] font-semibold leading-tight">Lead Galaxy</p>
+              <p className="text-faint text-[11px] leading-tight">Physique 57 India · Intelligence</p>
             </div>
           )}
         </div>
@@ -177,7 +180,7 @@ function Shell() {
           {!data && loading && <Loading />}
           {data && (
             <>
-              {module === "overview" && <Overview a={data} drill={drill} goExplorer={() => setModule("explorer")} />}
+              {module === "overview" && <Overview a={data} gran={granularity} setGran={setGranularity} drill={drill} goExplorer={() => setModule("explorer")} />}
               {module === "ai" && <AIView a={data} drill={drill} onOpenLead={(id) => {
                 // open lead drawer by fetching lead detail via API (we'll reuse LeadDrawer's data via analytics? quick fetch)
                 // we can fetch lead row via /api/leads and open drawer

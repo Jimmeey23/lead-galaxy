@@ -294,7 +294,15 @@ export function GraphicKpi({
     critical: "var(--critical)",
   };
   return (
-    <div onClick={onClick} className={cx("metric-card kpi-card", onClick && "cursor-pointer card-hover")}>
+    <div onClick={onClick} role={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onClick(); } } : undefined}
+      aria-label={onClick ? `${label}: ${value}. Explore underlying leads` : undefined}
+      className={cx("metric-card kpi-card focus-ring", onClick && "cursor-pointer card-hover")}>
+      {trend && trend.length > 1 && (() => {
+        const min = Math.min(...trend); const range = Math.max(...trend) - min || 1;
+        const points = trend.map((v, i) => `${(i / (trend.length - 1)) * 120},${29 - ((v - min) / range) * 25}`).join(" ");
+        return <svg className="kpi-sparkline" viewBox="0 0 120 34" role="img" aria-label={`${label} trend across ${trend.length} displayed periods`}><polyline points={points} fill="none" stroke={toneColor[tone]} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" pathLength="1" /></svg>;
+      })()}
       <div className="relative z-10">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">

@@ -1,6 +1,14 @@
 "use client";
 
-import React from "react";
+import React, { useSyncExternalStore } from "react";
+
+const subscribeMotion = (notify: () => void) => {
+  const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+  media.addEventListener("change", notify);
+  return () => media.removeEventListener("change", notify);
+};
+const motionSnapshot = () => !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const serverMotionSnapshot = () => false;
 import {
   Area,
   AreaChart,
@@ -83,15 +91,18 @@ export function TrendChart({
   series,
   height = 260,
   fmt,
+  onDrill,
 }: {
   data: Record<string, string | number>[];
   series: { key: string; name: string; color: string; type?: "area" | "line" | "bar"; yAxis?: "left" | "right" }[];
+  onDrill?: (date: string) => void;
   height?: number;
   fmt?: (k: string, v: number) => string;
 }) {
+  const animate = useSyncExternalStore(subscribeMotion, motionSnapshot, serverMotionSnapshot);
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <ComposedChart data={data} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
+      <ComposedChart onClick={(state) => { if (state.activeLabel != null) onDrill?.(String(state.activeLabel)); }} style={{ cursor: onDrill ? "pointer" : undefined }} data={data} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
         <defs>
           {series.map((s) => (
             <linearGradient key={s.key} id={`g-${s.key}`} x1="0" y1="0" x2="0" y2="1">
@@ -109,9 +120,9 @@ export function TrendChart({
         <Tooltip content={<TipBox fmt={fmt} />} cursor={{ stroke: "var(--border-strong)" }} />
         {series.map((s) =>
           s.type === "bar" ? (
-            <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} radius={[4, 4, 0, 0]} yAxisId={s.yAxis === "right" ? "right" : undefined} />
+            <Bar isAnimationActive={animate} animationDuration={850} key={s.key} dataKey={s.key} name={s.name} fill={s.color} radius={[4, 4, 0, 0]} yAxisId={s.yAxis === "right" ? "right" : undefined} />
           ) : s.type === "line" ? (
-            <Line
+            <Line isAnimationActive={animate} animationDuration={1000}
               key={s.key}
               dataKey={s.key}
               name={s.name}
@@ -121,7 +132,7 @@ export function TrendChart({
               yAxisId={s.yAxis === "right" ? "right" : undefined}
             />
           ) : (
-            <Area
+            <Area isAnimationActive={animate} animationDuration={1000}
               key={s.key}
               dataKey={s.key}
               name={s.name}

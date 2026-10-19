@@ -141,8 +141,7 @@ export function GroupTable({
 }
 
 /* --------------------------------- Overview -------------------------------- */
-export function Overview({ a, drill, goExplorer }: { a: Analytics; drill: (p: Partial<FilterState>) => void; goExplorer: () => void }) {
-  const [gran, setGran] = useState("month");
+export function Overview({ a, drill, goExplorer, gran, setGran }: { a: Analytics; drill: (p: Partial<FilterState>) => void; goExplorer: () => void; gran: string; setGran: (value: string) => void }) {
   const c = a.compare?.kpis;
   const k = a.kpis;
   const cmp = (f: (x: Kpis) => number) => (c ? { current: f(k), previous: f(c) } : null);
@@ -184,25 +183,30 @@ export function Overview({ a, drill, goExplorer }: { a: Analytics; drill: (p: Pa
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-        <GraphicKpi label="Total leads" value={num(k.totalLeads)} sub="distinct lead IDs" icon={<Users size={14} />} tone="accent" compare={cmp((x) => x.totalLeads)} onClick={goExplorer} />
-        <GraphicKpi label="Converted" value={num(k.converted)} sub={`${pctStr(k.conversionRate)} of leads`} icon={<BadgeCheck size={14} />} tone="positive" compare={cmp((x) => x.converted)} onClick={() => drill({ conversionStatus: ["Converted"] })} />
-        <GraphicKpi label="Conversion rate" value={pctStr(k.conversionRate)} sub="converted ÷ total" icon={<TrendingUp size={14} />} tone="info" compare={cmp((x) => x.conversionRate)} />
-        <GraphicKpi label="Trial leads" value={num(k.trials)} sub={`${pctStr(k.trialRate)} participation`} icon={<Activity size={14} />} tone="info" compare={cmp((x) => x.trials)} />
-        <GraphicKpi label="Trial rate" value={pctStr(k.trialRate)} sub="trial ÷ total" icon={<Activity size={14} />} tone="accent" />
-        <GraphicKpi label="Total purchases" value={num(k.purchases)} sub="from Sales sheet truth" icon={<Wallet size={14} />} tone="positive" compare={cmp((x) => x.purchases)} />
-        <GraphicKpi label="Total LTV" value={inrCompact(k.totalLtv)} sub="Sales-truth value" icon={<Wallet size={14} />} tone="positive" compare={cmp((x) => x.totalLtv)} />
-        <GraphicKpi label="Avg LTV / lead" value={inr(k.avgLtvPerLead)} sub="across all leads" icon={<Wallet size={14} />} tone="warning" compare={cmp((x) => x.avgLtvPerLead)} />
-        <GraphicKpi label="Avg LTV / converted" value={inr(k.avgLtvPerConverted)} sub="converted only" icon={<Wallet size={14} />} tone="warning" />
-        <GraphicKpi label="Total visits" value={num(k.visits)} sub="from Check-ins truth" icon={<Eye size={14} />} tone="info" compare={cmp((x) => x.visits)} />
-        <GraphicKpi label="Avg time to conversion" value={days(k.avgTimeToConversion)} invert sub="creation → conversion" icon={<Timer size={14} />} tone="info" compare={k.avgTimeToConversion != null && c?.avgTimeToConversion != null ? { current: k.avgTimeToConversion, previous: c.avgTimeToConversion } : null} />
+        <GraphicKpi label="Total leads" value={num(k.totalLeads)} sub="distinct lead IDs" icon={<Users size={14} />} tone="accent" compare={cmp((x) => x.totalLeads)} onClick={goExplorer} trend={a.series.map((point) => point.leads)} />
+        <GraphicKpi label="Converted" value={num(k.converted)} sub={`${pctStr(k.conversionRate)} of leads`} icon={<BadgeCheck size={14} />} tone="positive" compare={cmp((x) => x.converted)} onClick={() => drill({ conversionStatus: ["Converted"] })} trend={a.series.map((point) => point.converted)} />
+        <GraphicKpi label="Conversion rate" value={pctStr(k.conversionRate)} sub="converted ÷ total" icon={<TrendingUp size={14} />} tone="info" compare={cmp((x) => x.conversionRate)} trend={a.series.map((point) => point.conversionRate)} onClick={() => drill({ conversionStatus: ["Converted"] })} />
+        <GraphicKpi label="Trial leads" value={num(k.trials)} sub={`${pctStr(k.trialRate)} participation`} icon={<Activity size={14} />} tone="info" compare={cmp((x) => x.trials)} trend={a.series.map((point) => point.trials)} onClick={() => drill({ trialStatus: ["Trial Completed"] })} />
+        <GraphicKpi label="Trial rate" value={pctStr(k.trialRate)} sub="trial ÷ total" icon={<Activity size={14} />} tone="accent" trend={a.series.map((point) => point.leads ? point.trials / point.leads * 100 : 0)} onClick={() => drill({ trialStatus: ["Trial Completed"] })} />
+        <GraphicKpi label="Total purchases" value={num(k.purchases)} sub="from Sales sheet truth" icon={<Wallet size={14} />} tone="positive" compare={cmp((x) => x.purchases)} onClick={() => drill({ purchasesMin: 1 })} />
+        <GraphicKpi label="Total LTV" value={inrCompact(k.totalLtv)} sub="Sales-truth value" icon={<Wallet size={14} />} tone="positive" compare={cmp((x) => x.totalLtv)} trend={a.series.map((point) => point.ltv)} onClick={() => drill({ ltvMin: 0.01 })} />
+        <GraphicKpi label="Avg LTV / lead" value={inr(k.avgLtvPerLead)} sub="across all leads" icon={<Wallet size={14} />} tone="warning" compare={cmp((x) => x.avgLtvPerLead)} trend={a.series.map((point) => point.leads ? point.ltv / point.leads : 0)} onClick={goExplorer} />
+        <GraphicKpi label="Avg LTV / converted" value={inr(k.avgLtvPerConverted)} sub="converted only" icon={<Wallet size={14} />} tone="warning" onClick={() => drill({ conversionStatus: ["Converted"] })} />
+        <GraphicKpi label="Total visits" value={num(k.visits)} sub="from Check-ins truth" icon={<Eye size={14} />} tone="info" compare={cmp((x) => x.visits)} onClick={() => drill({ visitsMin: 1 })} />
+        <GraphicKpi label="Avg time to conversion" value={days(k.avgTimeToConversion)} invert sub="creation → conversion" icon={<Timer size={14} />} tone="info" compare={k.avgTimeToConversion != null && c?.avgTimeToConversion != null ? { current: k.avgTimeToConversion, previous: c.avgTimeToConversion } : null} onClick={() => drill({ conversionStatus: ["Converted"] })} />
         <GraphicKpi label="Follow-up coverage" value={pctStr(k.followUpCoverage)} sub="≥1 recorded FU" icon={<Phone size={14} />} tone="accent" compare={cmp((x) => x.followUpCoverage)} onClick={() => drill({ followUpActivity: "withFollowUps" })} />
-        <GraphicKpi label="Retained" value={num(k.retained)} sub={`${pctStr(k.retentionRate)} of converted`} icon={<Building2 size={14} />} tone="positive" compare={cmp((x) => x.retained)} />
-        <GraphicKpi label="Avg FU / lead" value={num(k.avgFollowUps, 2)} sub="mean follow-ups" icon={<Phone size={14} />} tone="accent" />
-        <GraphicKpi label="Avg days to 1st FU" value={days(k.avgDaysToFirstFollowUp)} invert icon={<Timer size={14} />} tone="warning" />
+        <GraphicKpi label="Retained" value={num(k.retained)} sub={`${pctStr(k.retentionRate)} of converted`} icon={<Building2 size={14} />} tone="positive" compare={cmp((x) => x.retained)} onClick={() => drill({ retentionStatus: ["Retained"] })} />
+        <GraphicKpi label="Avg FU / lead" value={num(k.avgFollowUps, 2)} sub="mean follow-ups" icon={<Phone size={14} />} tone="accent" onClick={goExplorer} />
+        <GraphicKpi label="Avg days to 1st FU" value={days(k.avgDaysToFirstFollowUp)} invert icon={<Timer size={14} />} tone="warning" onClick={() => drill({ followUpActivity: "withFollowUps" })} />
       </div>
-
-      <Card title="Lead acquisition & conversion trend" subtitle="Volume, converted leads and conversion rate over time" actions={<Toggle size="sm" value={gran} onChange={setGran} options={[{ value: "day", label: "Day" }, { value: "week", label: "Week" }, { value: "month", label: "Month" }]} />}>
-        <TrendChart height={300} data={a.series as unknown as Record<string, string | number>[]} series={[{ key: "leads", name: "Leads", color: "var(--chart-1)", type: "area" }, { key: "converted", name: "Converted", color: "var(--chart-3)", type: "area" }, { key: "conversionRate", name: "Conv. rate %", color: "var(--chart-2)", type: "line", yAxis: "right" }]} />
+      <Card title="Lead acquisition & conversion trend" subtitle="Lead creation cohorts · click a period to explore its leads" actions={<Toggle size="sm" value={gran} onChange={setGran} options={[{ value: "day", label: "Day" }, { value: "week", label: "Week" }, { value: "month", label: "Month" }]} />}>
+        <TrendChart height={300} onDrill={(date) => {
+          const from = date.length === 7 ? `${date}-01` : date;
+          const end = new Date(`${from}T00:00:00Z`);
+          if (gran === "month") end.setUTCMonth(end.getUTCMonth() + 1, 0);
+          else if (gran === "week") end.setUTCDate(end.getUTCDate() + 6);
+          drill({ preset: "Custom Range", dateDimension: "createdAt", from, to: end.toISOString().slice(0, 10) });
+        }} data={a.series as unknown as Record<string, string | number>[]} series={[{ key: "leads", name: "Leads", color: "var(--chart-1)", type: "area" }, { key: "converted", name: "Converted", color: "var(--chart-3)", type: "area" }, { key: "conversionRate", name: "Conv. rate %", color: "var(--chart-2)", type: "line", yAxis: "right" }]} />
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">

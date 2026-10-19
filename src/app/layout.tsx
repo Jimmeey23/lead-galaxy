@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Physique 57 India · Lead Intelligence",
+  title: "Lead Galaxy · Physique 57 India",
   description: "Lead Intelligence & Performance Analytics platform for Physique 57 India.",
 };
 
