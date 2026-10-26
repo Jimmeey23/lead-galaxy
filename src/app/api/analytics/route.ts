@@ -1,7 +1,7 @@
 import { CONVERSION_RULE_VERSION, CONVERSION_DEFINITION } from "@/lib/conversion";
 import { NextResponse } from "next/server";
 import { getLeads } from "@/lib/sheet";
-import { applyFilters, comparisonRange, resolveRange } from "@/lib/filters";
+import { applyFilters, comparisonRange, resolveRange, todayIST } from "@/lib/filters";
 import {
   buildInsights,
   computeKpis,
@@ -15,6 +15,12 @@ import { getCadence } from "@/lib/cadence";
 import type { FilterState, Lead } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+// Recent responses keyed by request body + data version + cadence; invalidated by sync and edits.
+const g = globalThis as unknown as { __analyticsMemo?: Map<string, string> };
+const memo = (g.__analyticsMemo ??= new Map<string, string>());
+const MEMO_MAX = 30;
+let facetCache: { version: number; value: ReturnType<typeof facets> } | null = null;
 
 function facets(leads: Lead[]) {
   const uniq = (fn: (l: Lead) => string) =>
@@ -120,11 +126,22 @@ function quality(leads: Lead[]) {
 
 export async function POST(req: Request) {
  try {
-  const body = (await req.json()) as { filters: FilterState; granularity?: "day" | "week" | "month" };
+  const raw = await req.text();
+  const body = JSON.parse(raw) as { filters: FilterState; granularity?: "day" | "week" | "month" };
   const f = body.filters;
   const cache = await getLeads();
   if (cache.error && !cache.leads.length)
     return NextResponse.json({ error: cache.error }, { status: 502 });
+
+  const cadenceConfig = await getCadence();
+  // Relative presets ("Today", "This Month") depend on the date, so include it.
+  const memoKey = `${cache.version}|${todayIST()}|${JSON.stringify(cadenceConfig)}|${raw}`;
+  const hit = memo.get(memoKey);
+  if (hit) {
+    memo.delete(memoKey);
+    memo.set(memoKey, hit);
+    return new NextResponse(hit, { headers: { "content-type": "application/json" } });
+  }
 
   const range = resolveRange(f.preset, f.from, f.to);
   const rows = applyFilters(cache.leads, f);
@@ -161,9 +178,9 @@ export async function POST(req: Request) {
     ).length,
   }));
 
-  const cadenceConfig = await getCadence();
   const ai = analyze(rows, cadenceConfig);
-  return NextResponse.json({
+  if (facetCache?.version !== cache.version) facetCache = { version: cache.version, value: facets(cache.leads) };
+  const json = JSON.stringify({
     meta: {
       conversionRuleVersion: CONVERSION_RULE_VERSION,
       conversionDefinition: CONVERSION_DEFINITION,
@@ -204,8 +221,11 @@ export async function POST(req: Request) {
     quality: quality(rows),
     insights: buildInsights(rows),
     ai,
-    facets: facets(cache.leads),
+    facets: facetCache.value,
   });
+  memo.set(memoKey, json);
+  if (memo.size > MEMO_MAX) memo.delete(memo.keys().next().value!);
+  return new NextResponse(json, { headers: { "content-type": "application/json" } });
  } catch (e) {
     const msg = (e as Error).message + "\n" + (e as Error).stack;
     console.error("analytics error", msg);

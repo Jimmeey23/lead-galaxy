@@ -2,7 +2,7 @@ import type { Lead } from "./types";
 
 export type PatternFinding = {
   id: string; title: string; severity: "high" | "medium"; count: number; share: number;
-  explanation: string; action: string; leadIds: string[];
+  explanation: string; action: string;
   owners: {name:string;affected:number;population:number;rate:number}[];
   evidence: { leadId: string; name: string; associate: string; detail: string }[];
 };
@@ -47,6 +47,7 @@ export function inspectLeadPatterns(leads: Lead[], today: string): PatternFindin
     if (lead.tried && !lead.converted && !lead.won) add("recovery", lead, `Checked-in visit: ${lead.trialCompletedAt}; no eligible purchase; owner: ${lead.associate}`);
     let previous: string | null = null;
     const local = new Map<string, number>();
+    const ownNames = textKey(lead.fullName).split(" ").filter((token)=>token.length>=3);
     lead.followUps.forEach((fu, index) => {
       const key = textKey(fu.comment);
       if (fu.date && (fu.date > today || (lead.createdAt && fu.date < lead.createdAt) || (previous && fu.date < previous))) add("date-sequence", lead, `FU${index+1}: ${fu.date}; created: ${lead.createdAt}; prior recorded step: ${previous ?? "none"}`);
@@ -55,7 +56,6 @@ export function inspectLeadPatterns(leads: Lead[], today: string): PatternFindin
       if (fu.date && (!key || key.length < 8 || /^(done|called|follow up|sent message|test)$/.test(key) || /\{\{?\w+\}?\}|\[(?:name|member|client|date)\]/i.test(fu.comment))) add("weak-comments", lead, `FU${index+1} (${fu.date}): “${fu.comment.slice(0,160) || "No outcome recorded"}”`);
       if (key.length >= 20 && local.has(key)) add("repeated-steps", lead, `FU${local.get(key)!+1} and FU${index+1}: “${fu.comment.slice(0,160)}”`);
       if (key) local.set(key,index);
-      const ownNames = textKey(lead.fullName).split(" ").filter((token)=>token.length>=3);
       const templateKey = key.split(" ").filter((token)=>!ownNames.includes(token)).join(" ").replace(/\d+/g,"#");
       if (templateKey.length>=50) { const items=templates.get(templateKey) ?? []; items.push({lead,index,comment:fu.comment}); templates.set(templateKey,items); }
       if (key.length >= 35) {
@@ -80,6 +80,6 @@ export function inspectLeadPatterns(leads: Lead[], today: string): PatternFindin
     for (const {lead} of values) ownerCounts.set(lead.associate,(ownerCounts.get(lead.associate) ?? 0)+1);
     const owners=[...ownerCounts].map(([name,affected])=>({name,affected,population:ownerPopulation.get(name) ?? 0,rate:affected/(ownerPopulation.get(name) || 1)*100})).sort((a,b)=>b.affected-a.affected);
     return values.length ? [{id,title,severity,explanation,action,count:values.length,share: leads.length ? values.length/leads.length*100 : 0,
-      owners, leadIds:values.map(({lead})=>lead.id), evidence:values.slice(0,100).map(({lead,details})=>({leadId:lead.id,name:lead.fullName,associate:lead.associate,detail:details.join(" · ")}))}] : [];
+      owners, evidence:values.slice(0,100).map(({lead,details})=>({leadId:lead.id,name:lead.fullName,associate:lead.associate,detail:details.join(" · ")}))}] : [];
   });
 }

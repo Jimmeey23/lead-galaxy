@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   CalendarDays,
   Filter,
@@ -400,6 +400,30 @@ export function FilterDrawer({
   );
 }
 
+/** Debounced so typing doesn't trigger a full analytics recompute per keystroke. */
+function SearchInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  const [synced, setSynced] = useState(value);
+  if (value !== synced) {
+    // external change (chip cleared, view applied)
+    setSynced(value);
+    setDraft(value);
+  }
+  useEffect(() => {
+    if (draft === value) return;
+    const t = setTimeout(() => onChange(draft), 350);
+    return () => clearTimeout(t);
+  }, [draft, value, onChange]);
+  return (
+    <Input
+      icon={<Search size={14} />}
+      placeholder="Search leads, emails, campaigns…"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+    />
+  );
+}
+
 export function TopBar({
   title,
   subtitle,
@@ -442,12 +466,7 @@ export function TopBar({
             </p>
           </div>
           <div className="order-last w-full md:order-none md:w-[260px]">
-            <Input
-              icon={<Search size={14} />}
-              placeholder="Search leads, emails, campaigns…"
-              value={filters.search ?? ""}
-              onChange={(e) => patch({ search: e.target.value })}
-            />
+            <SearchInput value={filters.search ?? ""} onChange={(search) => patch({ search })} />
           </div>
           <DateControl />
           <Button variant="outline" onClick={() => setDrawer(true)}>

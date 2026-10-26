@@ -58,7 +58,7 @@ export function AIView({ a, drill, onOpenLead }: { a: Analytics; drill: (p: Part
         <div className="flex flex-wrap gap-1.5">
           {(["missedFU", "opportunities", "discrepancies", "anomalies"] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)} className={cx("rounded-full px-3 py-1.5 text-[12.5px] font-medium", tab === t ? "text-[var(--accent-contrast)]" : "border hover:bg-[var(--surface-2)]")} style={tab === t ? { background: "var(--accent)" } : undefined}>
-              {t === "missedFU" ? `Missed follow-ups (${ai.missedFollowups.length})` : t === "opportunities" ? `Missed opportunities (${ai.missedOpportunities.length})` : t === "discrepancies" ? `Discrepancies (${ai.discrepancies.length})` : `Anomalies (${ai.anomalies.length})`}
+              {t === "missedFU" ? `Missed follow-ups (${ai.missedFollowups.length})` : t === "opportunities" ? `Missed opportunities (${ai.missedOpportunities.length})` : t === "discrepancies" ? `Discrepancies (${ai.summary.discrepancyCount})` : `Anomalies (${ai.summary.anomalyCount})`}
             </button>
           ))}
         </div>

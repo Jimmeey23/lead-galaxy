@@ -209,12 +209,14 @@ export function usePost<T>(url: string, body: unknown, deps: unknown[]) {
   const key = JSON.stringify(body);
   useEffect(() => {
     let cancelled = false;
+    const ctrl = new AbortController();
     setLoading(true);
     // Resolve against the page origin for fetch wrappers that require absolute URLs.
     fetch(new URL(url, window.location.origin).href, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: key,
+      signal: ctrl.signal,
     })
       .then(async (r) => {
         const ct = r.headers.get("content-type") || "";
@@ -237,6 +239,7 @@ export function usePost<T>(url: string, body: unknown, deps: unknown[]) {
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
+      ctrl.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, key, ...deps]);

@@ -20,41 +20,54 @@ export type Kpis = {
   avgDaysToFirstFollowUp: number | null;
 };
 
-const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
-const avg = (a: number[]) => (a.length ? sum(a) / a.length : null);
 const pct = (n: number, d: number) => (d ? (n / d) * 100 : 0);
 
 export function computeKpis(leads: Lead[]): Kpis {
+  // Single pass; first occurrence of each lead ID wins.
   const ids = new Set<string>();
-  const unique = leads.filter((l) => (ids.has(l.id) ? false : (ids.add(l.id), true)));
-  const total = unique.length;
-  const conv = unique.filter((l) => l.converted);
-  const trials = unique.filter((l) => l.tried);
-  const retained = unique.filter((l) => l.retained);
-  const ltv = sum(unique.map((l) => l.ltv ?? 0));
-  const ttc = conv.map((l) => l.daysToConversion).filter((d): d is number => d != null);
-  const fuDelay = unique
-    .map((l) => l.daysToFirstFollowUp)
+  let total = 0, won = 0, converted = 0, trials = 0, retained = 0, withFu = 0;
+  let ltv = 0, convLtv = 0, purchases = 0, visits = 0, followUps = 0;
+  let ttcSum = 0, ttcN = 0, fuSum = 0, fuN = 0;
+  for (const l of leads) {
+    if (ids.has(l.id)) continue;
+    ids.add(l.id);
+    total++;
+    const v = l.ltv ?? 0;
+    ltv += v;
+    purchases += l.purchases ?? 0;
+    visits += l.visits ?? 0;
+    followUps += l.followUpCount;
+    if (l.followUpCount > 0) withFu++;
+    if (l.won) won++;
+    if (l.tried) trials++;
+    if (l.retained) retained++;
+    if (l.converted) {
+      converted++;
+      convLtv += v;
+      if (l.daysToConversion != null) { ttcSum += l.daysToConversion; ttcN++; }
+    }
     // exclude implausible gaps (>1 year) which indicate mis-entered sheet dates
-    .filter((d): d is number => d != null && d >= 0 && d <= 365);
+    const d = l.daysToFirstFollowUp;
+    if (d != null && d >= 0 && d <= 365) { fuSum += d; fuN++; }
+  }
   return {
     totalLeads: total,
-    won: unique.filter((lead) => lead.won).length,
-    converted: conv.length,
-    conversionRate: pct(conv.length, total),
-    trials: trials.length,
-    trialRate: pct(trials.length, total),
-    purchases: sum(unique.map((l) => l.purchases ?? 0)),
+    won,
+    converted,
+    conversionRate: pct(converted, total),
+    trials,
+    trialRate: pct(trials, total),
+    purchases,
     totalLtv: ltv,
     avgLtvPerLead: total ? ltv / total : 0,
-    avgLtvPerConverted: conv.length ? sum(conv.map((l) => l.ltv ?? 0)) / conv.length : 0,
-    visits: sum(unique.map((l) => l.visits ?? 0)),
-    avgTimeToConversion: avg(ttc),
-    followUpCoverage: pct(unique.filter((l) => l.followUpCount > 0).length, total),
-    retained: retained.length,
-    retentionRate: pct(retained.length, conv.length),
-    avgFollowUps: total ? sum(unique.map((l) => l.followUpCount)) / total : 0,
-    avgDaysToFirstFollowUp: avg(fuDelay),
+    avgLtvPerConverted: converted ? convLtv / converted : 0,
+    visits,
+    avgTimeToConversion: ttcN ? ttcSum / ttcN : null,
+    followUpCoverage: pct(withFu, total),
+    retained,
+    retentionRate: pct(retained, converted),
+    avgFollowUps: total ? followUps / total : 0,
+    avgDaysToFirstFollowUp: fuN ? fuSum / fuN : null,
   };
 }
 

@@ -12,34 +12,53 @@ export const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edi
 /* ------------------------------ CSV parsing ------------------------------ */
 export function parseCSV(text: string): string[][] {
   const rows: string[][] = [];
+  const n = text.length;
   let row: string[] = [];
-  let field = "";
-  let inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (inQuotes) {
-      if (c === '"') {
-        if (text[i + 1] === '"') {
-          field += '"';
-          i++;
-        } else inQuotes = false;
-      } else field += c;
-    } else if (c === '"') inQuotes = true;
-    else if (c === ",") {
-      row.push(field);
-      field = "";
-    } else if (c === "\n") {
-      row.push(field);
+  let i = 0;
+  while (i < n) {
+    let field: string;
+    if (text.charCodeAt(i) === 34 /* " */) {
+      // quoted field: collect slices between escaped quotes
+      let out = "";
+      let from = ++i;
+      for (;;) {
+        const q = text.indexOf('"', i);
+        if (q < 0) { out += text.slice(from); i = n; break; }
+        if (text.charCodeAt(q + 1) === 34) { out += text.slice(from, q + 1); i = from = q + 2; continue; }
+        out += text.slice(from, q);
+        i = q + 1;
+        break;
+      }
+      // tolerate stray characters after the closing quote
+      while (i < n) {
+        const c = text.charCodeAt(i);
+        if (c === 44 || c === 10) break;
+        if (c !== 13) out += text[i];
+        i++;
+      }
+      field = out;
+    } else {
+      let j = i;
+      while (j < n) {
+        const c = text.charCodeAt(j);
+        if (c === 44 || c === 10) break;
+        j++;
+      }
+      field = text.slice(i, j);
+      if (field.includes("\r")) field = field.replace(/\r/g, "");
+      i = j;
+    }
+    row.push(field);
+    if (i >= n) { rows.push(row); break; }
+    if (text.charCodeAt(i) === 10) {
       rows.push(row);
       row = [];
-      field = "";
-    } else if (c === "\r") {
-      /* skip */
-    } else field += c;
-  }
-  if (field.length || row.length) {
-    row.push(field);
-    rows.push(row);
+      i++;
+      if (i >= n) break;
+    } else {
+      i++; // comma
+      if (i >= n) { row.push(""); rows.push(row); }
+    }
   }
   return rows;
 }
@@ -262,12 +281,15 @@ type Cache = {
   syncedAt: string | null;
   error: string | null;
   loading: Promise<void> | null;
+  /** Bumped whenever lead data changes; keys derived-response caches. */
+  version: number;
   crossSheet?: import("./types").CrossSheetMeta | null;
 };
 const g = globalThis as unknown as { __leadCache?: Cache };
 const cache: Cache =
   (g.__leadCache?.conversionRuleVersion === CONVERSION_RULE_VERSION ? g.__leadCache : null) ??
-  (g.__leadCache = { conversionRuleVersion: CONVERSION_RULE_VERSION, leads: [], headers: [], syncedAt: null, error: null, loading: null, crossSheet: null });
+  (g.__leadCache = { conversionRuleVersion: CONVERSION_RULE_VERSION, leads: [], headers: [], syncedAt: null, error: null, loading: null, version: 0, crossSheet: null });
+cache.version ??= 0;
 
 export const TTL_MS = 5 * 60 * 1000;
 
@@ -369,6 +391,9 @@ async function fetchWithRetry(url: string, tries = 3): Promise<string> {
 }
 
 async function doFetch() {
+  // Fetch the lead sheet and the Sales/Check-ins sheets concurrently.
+  const crossSheetPromise = import("./crossSheet").then(({ fetchCrossSheet }) => fetchCrossSheet());
+  crossSheetPromise.catch(() => {});
   const text = await fetchWithRetry(CSV_URL, 3);
   const { leads, headers } = normalise(parseCSV(text));
 
@@ -376,14 +401,20 @@ async function doFetch() {
   let crossSheetMeta: import("./types").CrossSheetMeta | null = null;
   let enrichmentError: string | null = null;
   try {
-    const { fetchCrossSheet } = await import("./crossSheet");
-    const cs = await fetchCrossSheet();
+    const cs = await crossSheetPromise;
     const { enrichedCount, totalLtv, totalVisits } = enrichWithCrossSheet(leads, cs.sales, cs.checkins, cs.checkinsAvailable);
     if (!cs.checkinsAvailable) enrichmentError = "Check-ins source unavailable; Trial Completed is unverified. Eligible sales conversion remains verified.";
+    const leadKeys = new Set<string>();
+    for (const l of leads) {
+      if (l.memberId) leadKeys.add(l.memberId);
+      if (l.email) leadKeys.add(l.email.toLowerCase());
+    }
+    let matchedLeads = 0;
+    for (const k of cs.sales.keys()) if (leadKeys.has(k)) matchedLeads++;
     crossSheetMeta = {
       salesRows: cs.stats.salesRows,
       checkinRows: cs.stats.checkinRows,
-      matchedLeads: [...cs.sales.keys()].filter((k) => leads.some((l) => l.memberId === k || l.email.toLowerCase() === k)).length,
+      matchedLeads,
       enrichedLeads: enrichedCount,
       totalLtv,
       totalVisits,
@@ -399,6 +430,7 @@ async function doFetch() {
   cache.syncedAt = new Date().toISOString();
   cache.error = enrichmentError;
   cache.crossSheet = crossSheetMeta;
+  cache.version++;
 }
 
 export async function getLeads(force = false): Promise<Cache> {
@@ -409,12 +441,14 @@ export async function getLeads(force = false): Promise<Cache> {
       cache.loading = doFetch()
         .catch((e: Error) => {
           cache.error = e.message;
+          cache.version++;
         })
         .finally(() => {
           cache.loading = null;
         });
     }
-    await cache.loading;
+    // Stale-while-revalidate: only block when there is nothing to serve yet.
+    if (force || !cache.leads.length) await cache.loading;
   }
   return cache;
 }
@@ -426,5 +460,6 @@ export function patchLead(id: string, patch: Partial<Lead>) {
     l.won = isWonStage(l.stageName);
     if (l.won) l.status = "Won";
     else if (/^won$/i.test(l.status.trim())) l.status = "Open";
+    cache.version++;
   }
 }

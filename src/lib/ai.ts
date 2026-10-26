@@ -97,14 +97,15 @@ export function cadenceForLead(lead: Lead, today = todayISO(), config: CadenceCo
   if (status === "missed") riskScore += 45;
   else if (status === "overdue") riskScore += 30;
   if (lead.followUpCount === 0) riskScore += 20;
-  if (lead.createdAt && dayDiff(lead.createdAt, today) > 21 && !lead.converted) riskScore += 15;
+  const age = dayDiff(lead.createdAt, today);
+  if (age > 21 && !lead.converted) riskScore += 15;
   if ((lead.visits ?? 0) > 2 && !lead.converted) riskScore += 10;
 
   // opportunity: visits, trial, recent creation, high LTV
   if ((lead.visits ?? 0) > 0) opportunityScore += 20;
   if (lead.tried) opportunityScore += 15;
   if ((lead.ltv ?? 0) > 50000) opportunityScore += 20;
-  if (lead.createdAt && dayDiff(lead.createdAt, today) <= 14) opportunityScore += 10;
+  if (age <= 14) opportunityScore += 10;
   if (lead.followUpCount === 0 && !lead.converted) opportunityScore += 10; // easy win
 
   riskScore = Math.min(100, Math.max(0, riskScore));
@@ -137,7 +138,18 @@ function todayISO() {
   const ist = new Date(d.getTime() + 330 * 60000);
   return ist.toISOString().slice(0, 10);
 }
+// Lead dates repeat heavily, so memoise the Date round-trip.
+const addDaysMemo = new Map<string, string | null>();
 function addDays(iso: string, n: number) {
+  const key = `${iso}|${n}`;
+  const hit = addDaysMemo.get(key);
+  if (hit !== undefined) return hit;
+  if (addDaysMemo.size > 50_000) addDaysMemo.clear();
+  const out = addDaysRaw(iso, n);
+  addDaysMemo.set(key, out);
+  return out;
+}
+function addDaysRaw(iso: string, n: number) {
   try {
     const d = new Date(iso + "T00:00:00Z");
     if (isNaN(d.getTime())) return null;
@@ -315,8 +327,9 @@ export function analyze(leads: Lead[], config: CadenceConfig = DEFAULT_CADENCE):
     },
     missedFollowups,
     missedOpportunities,
-    discrepancies,
-    anomalies,
+    // The UI lists at most 120; totals live in summary.
+    discrepancies: discrepancies.slice(0, 120),
+    anomalies: anomalies.slice(0, 120),
     cadenceBreakdown,
     riskByAssociate: groupRisk((r) => r.associate).slice(0, 12),
     riskByCenter: groupRisk((r) => r.center).slice(0, 12),
